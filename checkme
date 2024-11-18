@@ -1,0 +1,54 @@
+$.ajax({
+    url: '/your-rest-endpoint', // Replace with your endpoint URL
+    type: 'GET', // HTTP method (GET, POST, etc.)
+    dataType: 'json', // Specifies the expected response format
+    success: function(response) {
+        console.log('Success:', response);
+        // Handle the JSON response here
+    },
+    error: function(xhr, status, error) {
+        console.error('Error:', status, error);
+        // Handle the error here
+    }
+});
+
+$.ajax({
+    url: '/your-rest-endpoint', // Replace with your endpoint URL
+    type: 'POST', // HTTP method
+    contentType: 'application/json', // Specify the content type
+    data: JSON.stringify({
+        key1: 'value1', // Replace with your actual request data
+        key2: 'value2'
+    }), // JSON request body
+    success: function(response) {
+        console.log('Success:', response);
+        // Handle the JSON response here
+    },
+    error: function(xhr, status, error) {
+        console.error('Error:', status, error);
+        // Handle the error here
+    }
+});
+
+  events: function(start, end, timezone, callback) {
+    $.ajax({
+      url: 'myxmlfeed.php',
+      dataType: 'xml',
+      data: {
+        // our hypothetical feed requires UNIX timestamps
+        start: start.unix(),
+        end: end.unix()
+      },
+      success: function(doc) {
+        var events = [];
+        $(doc).find('event').each(function() {
+          events.push({
+            title: $(this).attr('title'),
+            start: $(this).attr('start') // will be parsed
+          });
+        });
+        callback(events);
+      }
+    });
+  }
+
