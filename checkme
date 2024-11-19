@@ -1,3 +1,20 @@
+function updateDropdown(dropdownId, options) {
+    const $dropdown = $(`#${dropdownId}`);
+    $dropdown.empty(); // Clear existing options
+
+    // Add default option
+    $dropdown.append('<option value="">Select an option</option>');
+
+    // Add new options from the list
+    options.forEach(option => {
+        $dropdown.append(
+            $('<option></option>')
+                .val(option.value)
+                .text(option.text)
+        );
+    });
+}
+
 $.ajax({
     url: '/your-rest-endpoint', // Replace with your endpoint URL
     type: 'GET', // HTTP method (GET, POST, etc.)
