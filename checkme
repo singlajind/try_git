@@ -1,3 +1,32 @@
+CREATE FUNCTION dbo.SplitString
+(
+    @InputString NVARCHAR(MAX),
+    @Delimiter CHAR(1)
+)
+RETURNS @OutputTable TABLE (Item NVARCHAR(MAX))
+AS
+BEGIN
+    DECLARE @Start INT = 1,
+            @End INT
+
+    SET @End = CHARINDEX(@Delimiter, @InputString, @Start)
+
+    WHILE @End > 0
+    BEGIN
+        INSERT INTO @OutputTable(Item)
+        VALUES (SUBSTRING(@InputString, @Start, @End - @Start))
+
+        SET @Start = @End + 1
+        SET @End = CHARINDEX(@Delimiter, @InputString, @Start)
+    END
+
+    INSERT INTO @OutputTable(Item)
+    VALUES (SUBSTRING(@InputString, @Start, LEN(@InputString) - @Start + 1))
+
+    RETURN
+END
+
+
 CREATE PROCEDURE AssignRoleToUsers
     @Usernames NVARCHAR(MAX), -- Semi-colon delimited usernames
     @RoleName NVARCHAR(50)    -- Role name
