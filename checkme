@@ -1,97 +1,58 @@
-$(`#${divId}`).next().next().find('li').each(function () {
-        if (!$(this).hasClass('selected')) {
-            $(this).remove();
-        }
-    });
+CREATE PROCEDURE AssignRoleToUsers
+    @Usernames NVARCHAR(MAX), -- Semi-colon delimited usernames
+    @RoleName NVARCHAR(50)    -- Role name
+AS
+BEGIN
+    SET NOCOUNT ON;
 
-<!-- Bootstrap CSS -->
-<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css">
+    -- Temporary table to store split usernames
+    CREATE TABLE #TempUsernames (Username NVARCHAR(100));
 
-<!-- Bootstrap Select CSS -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/css/bootstrap-select.min.css">
+    -- Split the delimited string into rows and insert into the temporary table
+    INSERT INTO #TempUsernames (Username)
+    SELECT TRIM(value) -- Remove leading/trailing spaces
+    FROM STRING_SPLIT(@Usernames, ';');
 
-<!-- jQuery -->
-<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    -- Iterate through each username
+    DECLARE @CurrentUsername NVARCHAR(100);
+    DECLARE @UserId INT;
 
-<!-- Bootstrap JS -->
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"></script>
+    DECLARE UsernameCursor CURSOR FOR
+    SELECT Username
+    FROM #TempUsernames;
 
-<!-- Bootstrap Select JS -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/js/bootstrap-select.min.js"></script>
+    OPEN UsernameCursor;
+    FETCH NEXT FROM UsernameCursor INTO @CurrentUsername;
 
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        -- Check if the user exists
+        SELECT @UserId = UserId
+        FROM Users
+        WHERE Username = @CurrentUsername;
 
+        -- If the user doesn't exist, insert a new one
+        IF @UserId IS NULL
+        BEGIN
+            INSERT INTO Users (Username)
+            VALUES (@CurrentUsername);
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.14.0-beta3/css/bootstrap-select.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.14.0-beta3/js/bootstrap-select.min.js"></script>
+            SET @UserId = SCOPE_IDENTITY(); -- Get the ID of the newly inserted user
+        END
 
-function updateDropdown(dropdownId, options) {
-    const $dropdown = $(`#${dropdownId}`);
-    $dropdown.empty(); // Clear existing options
+        -- Insert the role for the user
+        INSERT INTO Roles (UserId, RoleName)
+        VALUES (@UserId, @RoleName);
 
-    // Add default option
-    $dropdown.append('<option value="">Select an option</option>');
+        -- Move to the next username
+        FETCH NEXT FROM UsernameCursor INTO @CurrentUsername;
+    END
 
-    // Add new options from the list
-    options.forEach(option => {
-        $dropdown.append(
-            $('<option></option>')
-                .val(option.value)
-                .text(option.text)
-        );
-    });
-}
+    CLOSE UsernameCursor;
+    DEALLOCATE UsernameCursor;
 
-$.ajax({
-    url: '/your-rest-endpoint', // Replace with your endpoint URL
-    type: 'GET', // HTTP method (GET, POST, etc.)
-    dataType: 'json', // Specifies the expected response format
-    success: function(response) {
-        console.log('Success:', response);
-        // Handle the JSON response here
-    },
-    error: function(xhr, status, error) {
-        console.error('Error:', status, error);
-        // Handle the error here
-    }
-});
+    -- Clean up the temporary table
+    DROP TABLE #TempUsernames;
 
-$.ajax({
-    url: '/your-rest-endpoint', // Replace with your endpoint URL
-    type: 'POST', // HTTP method
-    contentType: 'application/json', // Specify the content type
-    data: JSON.stringify({
-        key1: 'value1', // Replace with your actual request data
-        key2: 'value2'
-    }), // JSON request body
-    success: function(response) {
-        console.log('Success:', response);
-        // Handle the JSON response here
-    },
-    error: function(xhr, status, error) {
-        console.error('Error:', status, error);
-        // Handle the error here
-    }
-});
-
-  events: function(start, end, timezone, callback) {
-    $.ajax({
-      url: 'myxmlfeed.php',
-      dataType: 'xml',
-      data: {
-        // our hypothetical feed requires UNIX timestamps
-        start: start.unix(),
-        end: end.unix()
-      },
-      success: function(doc) {
-        var events = [];
-        $(doc).find('event').each(function() {
-          events.push({
-            title: $(this).attr('title'),
-            start: $(this).attr('start') // will be parsed
-          });
-        });
-        callback(events);
-      }
-    });
-  }
-
+    SET NOCOUNT OFF;
+END;
