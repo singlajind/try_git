@@ -1,3 +1,4 @@
+openssl pkcs12 -export -inkey private.pem -in cert.pem -out keystore.p12
 CREATE FUNCTION dbo.SplitString
 (
     @InputString NVARCHAR(MAX),
