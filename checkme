@@ -1,3 +1,34 @@
+https://api.openfigi.com/v2/mapping
+
+Content-Type: application/json
+X-OPENFIGI-APIKEY: Your API key
+
+[
+    {
+        "idType": "TICKER",
+        "idValue": "AAPL",
+        "exchangeCode": "US"  // Optional: Specify the exchange
+    }
+]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 CREATE FUNCTION dbo.SplitString
 (
     @String NVARCHAR(MAX),
