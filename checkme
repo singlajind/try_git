@@ -1,3 +1,12 @@
+STUFF((
+        SELECT ',' + t2.c
+        FROM tablename t2
+        WHERE t2.a = t.a AND t2.b = t.b
+        FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 1, '') AS c_agg
+
+
+
+
 https://api.openfigi.com/v2/mapping
 
 Content-Type: application/json
