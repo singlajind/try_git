@@ -1,3 +1,79 @@
+public class BloombergAuthServiceExample {
+    private static final String AUTH_SERVICE = "//blp/apiauth";
+    private static final String DATA_SERVICE = "//blp/refdata"; // Example: Reference Data Service
+    private static final String HOST = "localhost"; // Change if connecting remotely
+    private static final int PORT = 8194; // Bloomberg API default port
+
+    public static void main(String[] args) {
+        String uuid = "123456";  // Replace with your Bloomberg UUID
+        String ipAddress = "192.168.1.100";  // Replace with your Bloomberg IP
+
+        // Set up session options with authentication
+        SessionOptions sessionOptions = new SessionOptions();
+        sessionOptions.setServerHost(HOST);
+        sessionOptions.setServerPort(PORT);
+        sessionOptions.setAuthenticationOptions("AuthenticationMode=APPLICATION_ONLY;"
+                + "ApplicationAuthenticationType=APP_UUID;"
+                + "ApplicationIdentifier=" + uuid);
+
+        try {
+            // Create a session
+            Session session = new Session(sessionOptions);
+            if (!session.start()) {
+                System.out.println("Failed to start session.");
+                return;
+            }
+            System.out.println("Session started successfully.");
+
+            // Open the AuthService
+            if (!session.openService(AUTH_SERVICE)) {
+                System.out.println("Failed to open AuthService.");
+                return;
+            }
+            Service authService = session.getService(AUTH_SERVICE);
+            System.out.println("AuthService opened successfully.");
+
+            // Create an Identity and send an authorization request
+            Identity identity = session.createIdentity();
+            Request authRequest = authService.createAuthorizationRequest();
+            authRequest.set("uuid", Integer.parseInt(uuid));
+            authRequest.set("ipAddress", ipAddress);
+
+            // Send authentication request
+            CorrelationID authCorrId = new CorrelationID(identity);
+            session.sendAuthorizationRequest(authRequest, identity, authCorrId);
+
+            // Wait for the response
+            boolean isAuthorized = false;
+            long startTime = System.currentTimeMillis();
+            while ((System.currentTimeMillis() - startTime) < 5000) { // 5 seconds timeout
+                EventQueue eventQueue = new EventQueue();
+                Event event = session.nextEvent(500); // Wait for 500ms per iteration
+
+                if (event.eventType() == Event.EventType.RESPONSE || event.eventType() == Event.EventType.PARTIAL_RESPONSE) {
+                    for (Message msg : event) {
+                        System.out.println("Response: " + msg);
+                        if (msg.messageType().equals("AuthorizationSuccess")) {
+                            isAuthorized = true;
+                        }
+                    }
+                }
+            }
+
+            if (isAuthorized) {
+                System.out.println("Authorization successful! Identity is ready to use.");
+                // Now you can use `identity` for data requests
+            } else {
+                System.out.println("Authorization failed.");
+            }
+
+            session.stop();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
 STUFF((
         SELECT ',' + t2.c
         FROM tablename t2
