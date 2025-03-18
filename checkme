@@ -1,3 +1,24 @@
+SELECT EmployeeID,
+       STUFF((
+           SELECT ', ' + Department
+           FROM Employee AS e2
+           WHERE e2.EmployeeID = e1.EmployeeID
+           FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'),
+           1, 2, '') AS DepartmentList
+FROM Employee AS e1
+GROUP BY EmployeeID;
+
+
+
+
+
+
+
+
+
+
+
+
 public class BloombergAuthServiceExample {
     private static final String AUTH_SERVICE = "//blp/apiauth";
     private static final String DATA_SERVICE = "//blp/refdata"; // Example: Reference Data Service
