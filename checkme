@@ -1,3 +1,11 @@
+SELECT STUFF((
+    SELECT ', ' + Department
+    FROM Employee
+    FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'),
+    1, 2, '') AS DepartmentList;
+
+
+
 SELECT EmployeeID,
        STUFF((
            SELECT ', ' + Department
