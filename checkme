@@ -1,272 +1,103 @@
-curve25519-sha256@libssh.org
-ecdh-sha2-nistp256
-ecdh-sha2-nistp384
-ecdh-sha2-nistp521
-diffie-hellman-group-exchange-sha256
-diffie-hellman-group-exchange-sha1
-diffie-hellman-group14-sha1
+public boolean isTickerValid(String ticker, String exchange) {
+    OpenFigiRequest[] request = new OpenFigiRequest[]{
+            new OpenFigiRequest(ticker, exchange)
+    };
 
+    HttpHeaders headers = new HttpHeaders();
+    headers.set("Content-Type", "application/json");
 
+    HttpEntity<OpenFigiRequest[]> entity = new HttpEntity<>(request, headers);
 
-SELECT STUFF((
-    SELECT ', ' + Department
-    FROM Employee
-    FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'),
-    1, 2, '') AS DepartmentList;
+    OpenFigiResponse[] response = restTemplate
+            .exchange(figiUrl, HttpMethod.POST, entity, OpenFigiResponse[].class)
+            .getBody();
 
+    return response != null && response.length > 0 && response[0].getFigi() != null;
+}
 
+public class OpenFigiRequest {
 
-SELECT EmployeeID,
-       STUFF((
-           SELECT ', ' + Department
-           FROM Employee AS e2
-           WHERE e2.EmployeeID = e1.EmployeeID
-           FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'),
-           1, 2, '') AS DepartmentList
-FROM Employee AS e1
-GROUP BY EmployeeID;
+    @JsonProperty("idType")
+    private String idType = "TICKER";
 
+    @JsonProperty("idValue")
+    private String idValue;
 
+    @JsonProperty("exchCode")
+    private String exchCode;
 
-
-
-
-
-
-
-
-
-
-public class BloombergAuthServiceExample {
-    private static final String AUTH_SERVICE = "//blp/apiauth";
-    private static final String DATA_SERVICE = "//blp/refdata"; // Example: Reference Data Service
-    private static final String HOST = "localhost"; // Change if connecting remotely
-    private static final int PORT = 8194; // Bloomberg API default port
-
-    public static void main(String[] args) {
-        String uuid = "123456";  // Replace with your Bloomberg UUID
-        String ipAddress = "192.168.1.100";  // Replace with your Bloomberg IP
-
-        // Set up session options with authentication
-        SessionOptions sessionOptions = new SessionOptions();
-        sessionOptions.setServerHost(HOST);
-        sessionOptions.setServerPort(PORT);
-        sessionOptions.setAuthenticationOptions("AuthenticationMode=APPLICATION_ONLY;"
-                + "ApplicationAuthenticationType=APP_UUID;"
-                + "ApplicationIdentifier=" + uuid);
-
-        try {
-            // Create a session
-            Session session = new Session(sessionOptions);
-            if (!session.start()) {
-                System.out.println("Failed to start session.");
-                return;
-            }
-            System.out.println("Session started successfully.");
-
-            // Open the AuthService
-            if (!session.openService(AUTH_SERVICE)) {
-                System.out.println("Failed to open AuthService.");
-                return;
-            }
-            Service authService = session.getService(AUTH_SERVICE);
-            System.out.println("AuthService opened successfully.");
-
-            // Create an Identity and send an authorization request
-            Identity identity = session.createIdentity();
-            Request authRequest = authService.createAuthorizationRequest();
-            authRequest.set("uuid", Integer.parseInt(uuid));
-            authRequest.set("ipAddress", ipAddress);
-
-            // Send authentication request
-            CorrelationID authCorrId = new CorrelationID(identity);
-            session.sendAuthorizationRequest(authRequest, identity, authCorrId);
-
-            // Wait for the response
-            boolean isAuthorized = false;
-            long startTime = System.currentTimeMillis();
-            while ((System.currentTimeMillis() - startTime) < 5000) { // 5 seconds timeout
-                EventQueue eventQueue = new EventQueue();
-                Event event = session.nextEvent(500); // Wait for 500ms per iteration
-
-                if (event.eventType() == Event.EventType.RESPONSE || event.eventType() == Event.EventType.PARTIAL_RESPONSE) {
-                    for (Message msg : event) {
-                        System.out.println("Response: " + msg);
-                        if (msg.messageType().equals("AuthorizationSuccess")) {
-                            isAuthorized = true;
-                        }
-                    }
-                }
-            }
-
-            if (isAuthorized) {
-                System.out.println("Authorization successful! Identity is ready to use.");
-                // Now you can use `identity` for data requests
-            } else {
-                System.out.println("Authorization failed.");
-            }
-
-            session.stop();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public OpenFigiRequest(String idValue, String exchCode) {
+        this.idValue = idValue;
+        this.exchCode = exchCode;
     }
 
-
-STUFF((
-        SELECT ',' + t2.c
-        FROM tablename t2
-        WHERE t2.a = t.a AND t2.b = t.b
-        FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 1, '') AS c_agg
+    // Getters and Setters
+}
 
 
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class OpenFigiResponse {
+    private String figi;
+    private String name;
 
-
-https://api.openfigi.com/v2/mapping
-
-Content-Type: application/json
-X-OPENFIGI-APIKEY: Your API key
-
-[
-    {
-        "idType": "TICKER",
-        "idValue": "AAPL",
-        "exchangeCode": "US"  // Optional: Specify the exchange
+    public String getFigi() {
+        return figi;
     }
-]
 
+    public String getName() {
+        return name;
+    }
 
+    // Getters and Setters
+}
 
+@Service
+public class FigiService {
 
+    @Value("${openfigi.api.url}")
+    private String figiUrl;
 
+    @Value("${openfigi.api.key}")
+    private String apiKey;
 
+    private final RestTemplate restTemplate;
 
+    public FigiService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
+    public boolean isTickerValid(String ticker, String exchange) {
+        OpenFigiRequest[] request = new OpenFigiRequest[]{
+                new OpenFigiRequest(ticker, exchange)
+        };
 
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Content-Type", "application/json");
+        headers.set("X-OPENFIGI-APIKEY", apiKey);
 
+        HttpEntity<OpenFigiRequest[]> entity = new HttpEntity<>(request, headers);
 
+        OpenFigiResponse[] response = restTemplate
+                .exchange(figiUrl, HttpMethod.POST, entity, OpenFigiResponse[].class)
+                .getBody();
 
+        return response != null && response.length > 0 && response[0].getFigi() != null;
+    }
+}
 
+public boolean isTickerValid(String ticker, String exchange) {
+    OpenFigiRequest[] request = new OpenFigiRequest[]{
+            new OpenFigiRequest(ticker, exchange)
+    };
 
+    HttpHeaders headers = new HttpHeaders();
+    headers.set("Content-Type", "application/json");
 
+    HttpEntity<OpenFigiRequest[]> entity = new HttpEntity<>(request, headers);
 
+    OpenFigiResponse[] response = restTemplate
+            .exchange(figiUrl, HttpMethod.POST, entity, OpenFigiResponse[].class)
+            .getBody();
 
-
-
-CREATE FUNCTION dbo.SplitString
-(
-    @String NVARCHAR(MAX),
-    @Delimiter CHAR(1)
-)
-RETURNS @Result TABLE (SplitValue NVARCHAR(MAX))
-AS
-BEGIN
-    DECLARE @Start INT, @End INT
-    SET @Start = 1
-    SET @End = CHARINDEX(@Delimiter, @String)
-
-    WHILE @End > 0
-    BEGIN
-        INSERT INTO @Result (SplitValue)
-        VALUES (SUBSTRING(@String, @Start, @End - @Start))
-        
-        SET @Start = @End + 1
-        SET @End = CHARINDEX(@Delimiter, @String, @Start)
-    END
-
-    INSERT INTO @Result (SplitValue)
-    VALUES (SUBSTRING(@String, @Start, LEN(@String) - @Start + 1))
-
-    RETURN
-END;
-
-
-
-openssl pkcs12 -export -inkey private.pem -in cert.pem -out keystore.p12
-CREATE FUNCTION dbo.SplitString
-(
-    @InputString NVARCHAR(MAX),
-    @Delimiter CHAR(1)
-)
-RETURNS @OutputTable TABLE (Item NVARCHAR(MAX))
-AS
-BEGIN
-    DECLARE @Start INT = 1,
-            @End INT
-
-    SET @End = CHARINDEX(@Delimiter, @InputString, @Start)
-
-    WHILE @End > 0
-    BEGIN
-        INSERT INTO @OutputTable(Item)
-        VALUES (SUBSTRING(@InputString, @Start, @End - @Start))
-
-        SET @Start = @End + 1
-        SET @End = CHARINDEX(@Delimiter, @InputString, @Start)
-    END
-
-    INSERT INTO @OutputTable(Item)
-    VALUES (SUBSTRING(@InputString, @Start, LEN(@InputString) - @Start + 1))
-
-    RETURN
-END
-
-
-CREATE PROCEDURE AssignRoleToUsers
-    @Usernames NVARCHAR(MAX), -- Semi-colon delimited usernames
-    @RoleName NVARCHAR(50)    -- Role name
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    -- Temporary table to store split usernames
-    CREATE TABLE #TempUsernames (Username NVARCHAR(100));
-
-    -- Split the delimited string into rows and insert into the temporary table
-    INSERT INTO #TempUsernames (Username)
-    SELECT TRIM(value) -- Remove leading/trailing spaces
-    FROM STRING_SPLIT(@Usernames, ';');
-
-    -- Iterate through each username
-    DECLARE @CurrentUsername NVARCHAR(100);
-    DECLARE @UserId INT;
-
-    DECLARE UsernameCursor CURSOR FOR
-    SELECT Username
-    FROM #TempUsernames;
-
-    OPEN UsernameCursor;
-    FETCH NEXT FROM UsernameCursor INTO @CurrentUsername;
-
-    WHILE @@FETCH_STATUS = 0
-    BEGIN
-        -- Check if the user exists
-        SELECT @UserId = UserId
-        FROM Users
-        WHERE Username = @CurrentUsername;
-
-        -- If the user doesn't exist, insert a new one
-        IF @UserId IS NULL
-        BEGIN
-            INSERT INTO Users (Username)
-            VALUES (@CurrentUsername);
-
-            SET @UserId = SCOPE_IDENTITY(); -- Get the ID of the newly inserted user
-        END
-
-        -- Insert the role for the user
-        INSERT INTO Roles (UserId, RoleName)
-        VALUES (@UserId, @RoleName);
-
-        -- Move to the next username
-        FETCH NEXT FROM UsernameCursor INTO @CurrentUsername;
-    END
-
-    CLOSE UsernameCursor;
-    DEALLOCATE UsernameCursor;
-
-    -- Clean up the temporary table
-    DROP TABLE #TempUsernames;
-
-    SET NOCOUNT OFF;
-END;
+    return response != null && response.length > 0 && response[0].getFigi() != null;
+}
