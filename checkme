@@ -1,103 +1,120 @@
-public boolean isTickerValid(String ticker, String exchange) {
-    OpenFigiRequest[] request = new OpenFigiRequest[]{
-            new OpenFigiRequest(ticker, exchange)
-    };
-
-    HttpHeaders headers = new HttpHeaders();
-    headers.set("Content-Type", "application/json");
-
-    HttpEntity<OpenFigiRequest[]> entity = new HttpEntity<>(request, headers);
-
-    OpenFigiResponse[] response = restTemplate
-            .exchange(figiUrl, HttpMethod.POST, entity, OpenFigiResponse[].class)
-            .getBody();
-
-    return response != null && response.length > 0 && response[0].getFigi() != null;
-}
-
-public class OpenFigiRequest {
-
-    @JsonProperty("idType")
-    private String idType = "TICKER";
-
-    @JsonProperty("idValue")
-    private String idValue;
-
-    @JsonProperty("exchCode")
+public class SecurityData {
+    private String figi;
+    private String securityType;
+    private String marketSector;
+    private String ticker;
+    private String name;
     private String exchCode;
-
-    public OpenFigiRequest(String idValue, String exchCode) {
-        this.idValue = idValue;
-        this.exchCode = exchCode;
-    }
+    private String shareClassFIGI;
+    private String compositeFIGI;
+    private String securityType2;
+    private String securityDescription;
 
     // Getters and Setters
-}
-
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class OpenFigiResponse {
-    private String figi;
-    private String name;
-
     public String getFigi() {
         return figi;
+    }
+
+    public void setFigi(String figi) {
+        this.figi = figi;
+    }
+
+    public String getSecurityType() {
+        return securityType;
+    }
+
+    public void setSecurityType(String securityType) {
+        this.securityType = securityType;
+    }
+
+    public String getMarketSector() {
+        return marketSector;
+    }
+
+    public void setMarketSector(String marketSector) {
+        this.marketSector = marketSector;
+    }
+
+    public String getTicker() {
+        return ticker;
+    }
+
+    public void setTicker(String ticker) {
+        this.ticker = ticker;
     }
 
     public String getName() {
         return name;
     }
 
-    // Getters and Setters
-}
-
-@Service
-public class FigiService {
-
-    @Value("${openfigi.api.url}")
-    private String figiUrl;
-
-    @Value("${openfigi.api.key}")
-    private String apiKey;
-
-    private final RestTemplate restTemplate;
-
-    public FigiService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public boolean isTickerValid(String ticker, String exchange) {
-        OpenFigiRequest[] request = new OpenFigiRequest[]{
-                new OpenFigiRequest(ticker, exchange)
-        };
+    public String getExchCode() {
+        return exchCode;
+    }
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Content-Type", "application/json");
-        headers.set("X-OPENFIGI-APIKEY", apiKey);
+    public void setExchCode(String exchCode) {
+        this.exchCode = exchCode;
+    }
 
-        HttpEntity<OpenFigiRequest[]> entity = new HttpEntity<>(request, headers);
+    public String getShareClassFIGI() {
+        return shareClassFIGI;
+    }
 
-        OpenFigiResponse[] response = restTemplate
-                .exchange(figiUrl, HttpMethod.POST, entity, OpenFigiResponse[].class)
-                .getBody();
+    public void setShareClassFIGI(String shareClassFIGI) {
+        this.shareClassFIGI = shareClassFIGI;
+    }
 
-        return response != null && response.length > 0 && response[0].getFigi() != null;
+    public String getCompositeFIGI() {
+        return compositeFIGI;
+    }
+
+    public void setCompositeFIGI(String compositeFIGI) {
+        this.compositeFIGI = compositeFIGI;
+    }
+
+    public String getSecurityType2() {
+        return securityType2;
+    }
+
+    public void setSecurityType2(String securityType2) {
+        this.securityType2 = securityType2;
+    }
+
+    public String getSecurityDescription() {
+        return securityDescription;
+    }
+
+    public void setSecurityDescription(String securityDescription) {
+        this.securityDescription = securityDescription;
     }
 }
 
-public boolean isTickerValid(String ticker, String exchange) {
-    OpenFigiRequest[] request = new OpenFigiRequest[]{
-            new OpenFigiRequest(ticker, exchange)
-    };
 
-    HttpHeaders headers = new HttpHeaders();
-    headers.set("Content-Type", "application/json");
+import java.util.List;
 
-    HttpEntity<OpenFigiRequest[]> entity = new HttpEntity<>(request, headers);
+public class SecurityResponse {
+    private List<SecurityData> data;
 
-    OpenFigiResponse[] response = restTemplate
-            .exchange(figiUrl, HttpMethod.POST, entity, OpenFigiResponse[].class)
-            .getBody();
+    public List<SecurityData> getData() {
+        return data;
+    }
 
-    return response != null && response.length > 0 && response[0].getFigi() != null;
+    public void setData(List<SecurityData> data) {
+        this.data = data;
+    }
+}
+
+public class TopLevelResponse {
+    private List<SecurityResponse> data;
+
+    public List<SecurityResponse> getData() {
+        return data;
+    }
+
+    public void setData(List<SecurityResponse> data) {
+        this.data = data;
+    }
 }
