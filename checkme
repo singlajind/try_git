@@ -1,3 +1,9 @@
+SELECT 
+    RIGHT(CONVERT(VARCHAR(4), YEAR(CONVERT(DATE, YourColumn, 101))), 2) 
+    + '-' + UPPER(LEFT(DATENAME(MONTH, CONVERT(DATE, YourColumn, 101)), 3)) AS FormattedDate
+FROM YourTable;
+
+
 public class SecurityData {
     private String figi;
     private String securityType;
