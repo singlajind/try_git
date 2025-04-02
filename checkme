@@ -1,3 +1,17 @@
+Event event = session.nextEvent();
+                for (Message msg : event) {
+                    if (event.eventType() == Event.EventType.TOKEN_STATUS) {
+                        if (msg.messageType().toString().equals("TokenGenerationSuccess")) {
+                            authToken = msg.getElementAsString("token");
+                            tokenGenerated = true;
+                            System.out.println("Token successfully generated.");
+                        } else if (msg.messageType().toString().equals("TokenGenerationFailure")) {
+                            System.out.println("Token generation failed.");
+                            return;
+                        }
+                    }
+
+
 SELECT 
     RIGHT(CONVERT(VARCHAR(4), YEAR(CONVERT(DATE, YourColumn, 101))), 2) 
     + '-' + UPPER(LEFT(DATENAME(MONTH, CONVERT(DATE, YourColumn, 101)), 3)) AS FormattedDate
