@@ -1,3 +1,22 @@
+Service authService = session.getService("//blp/apiauth");
+        Request authRequest = authService.createAuthorizationRequest();
+        authRequest.set("token", token);
+
+        session.sendAuthorizationRequest(authRequest, identity, new CorrelationID(2));
+
+        while (true) {
+            Event event = session.nextEvent();
+            for (Message msg : event) {
+                if (event.eventType() == Event.EventType.RESPONSE) {
+                    System.out.println("Authorization success.");
+                    return true;
+                } else if (event.eventType() == Event.EventType.REQUEST_STATUS) {
+                    System.out.println("Authorization failed.");
+                    return false;
+                }
+            }
+        }
+
 Event event = session.nextEvent();
                 for (Message msg : event) {
                     if (event.eventType() == Event.EventType.TOKEN_STATUS) {
