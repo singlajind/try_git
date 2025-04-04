@@ -1,3 +1,60 @@
+<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi</artifactId>
+			<version>5.2.2</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>5.2.2</version>
+		</dependency>
+
+
+
+
+XSSFWorkbook workbook = new XSSFWorkbook(fis);
+		Workbook book = new Workbook();
+		book.setData(new LinkedHashMap<String, List<LinkedHashMap<String, Object>>>());
+		int sheetCount = workbook.getNumberOfSheets();
+		while (sheetCount > 0) {
+			sheetCount--;
+			XSSFSheet sheet = workbook.getSheetAt(sheetCount);
+			book.getData().put(sheet.getSheetName(), new LinkedList<LinkedHashMap<String, Object>>());
+			Iterator<Row> rowIterator = sheet.iterator();
+			List<String> header = rowIterator.hasNext() ? readHeader(rowIterator.next()) : Collections.EMPTY_LIST;
+			while (rowIterator.hasNext()) {
+				Row row = rowIterator.next();
+				LinkedHashMap<String, Object> cells = new LinkedHashMap<>();
+				// For each row, iterate through all the columns
+				Iterator<Cell> cellIterator = row.cellIterator();
+				while (cellIterator.hasNext()) {
+					Cell cell = cellIterator.next();
+					// Check the cell type and format accordingly
+					if (CellType.BOOLEAN.equals(cell.getCellType())) {
+						cells.put(header.get(cell.getColumnIndex()), cell.getBooleanCellValue());
+					} 
+					else if (CellType.NUMERIC.equals(cell.getCellType())) {
+						cells.put(header.get(cell.getColumnIndex()), cell.getNumericCellValue());
+					} 
+					else if (CellType.BLANK.equals(cell.getCellType())) {
+						continue;
+					} else {
+						cells.put(header.get(cell.getColumnIndex()), cell.getStringCellValue());
+					}
+
+				}
+				// add only if there are non empty cells.
+				if (!cells.isEmpty()) {
+					book.getData().get(sheet.getSheetName()).add(cells);
+				}
+			}
+		}
+		workbook.close();
+		return book;
+
+
+
 @PostMapping("/readExcel/{dataCenterId}")
 public ResponseEntity<DataCenterDto> userInfraDetails(@RequestBody Map<String, String> input, @PathVariable BigInteger dataCenterId) throws Exception {
             DataCenter dataCenter = null;
