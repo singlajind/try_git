@@ -1,7 +1,112 @@
-AuthenticationMode=USER_AND_APPLICATION;UUID=YOUR_UUID;APPNAME=YOUR_APPNAME
+@PostMapping("/readExcel/{dataCenterId}")
+public ResponseEntity<DataCenterDto> userInfraDetails(@RequestBody Map<String, String> input, @PathVariable BigInteger dataCenterId) throws Exception {
+            DataCenter dataCenter = null;
+            if(StringUtils.hasLength(input.get("filePath"))) {
+                        dataCenter = excelUploadService.processExcelFile(input.get("filePath"), dataCenterId);
+            } else if(StringUtils.hasLength(input.get("file"))) {
+                        dataCenter = excelUploadService.processExcelContent(input.get("file"), dataCenterId);
+            } else {
+                        throw new Exception("Neither Excel file path nor file content has been provided");
+            }
+            
+            assessmentClient.evaluateDataCenterDiscovery(dataCenterId);
+            return new ResponseEntity<DataCenterDto>(dataCenter.toDto(), HttpStatus.OK);
+}
 
-String authOptions = "AuthenticationMode=USER_AND_APPLICATION;UUID=" + UUID + ";APPNAME=" + APP_NAME;
-            SessionOptions sessionOptions = new SessionOptions();
-            sessionOptions.setServerHost(SERVER_HOST);
-            sessionOptions.setServerPort(SERVER_PORT);
-            sessionOptions.setAuthenticationOptions(authOptions);
+
+
+
+
+	public DataCenter processExcelContent(String fileContent, BigInteger dcId) throws Exception {
+		Workbook workbook = ExcelUtil.readFileContent(fileContent);
+		DataCenter dc = parseExcelContent(workbook, dcId);
+		return dc;
+	}
+
+
+
+
+
+	private List<Host> parseHost(List<LinkedHashMap<String, Object>> hostSheet, DataCenter dataCenter){
+		List<Host> hosts = new ArrayList<Host>();
+		if (CollectionUtils.isNotEmpty(hostSheet)) {
+			hostSheet.stream().forEach(map -> {
+				String name = (String) map.get(mapper.getHostNameColumn());
+				String ipAddress = (String) map.get(mapper.getIPAddressColumn());
+				String details = JsonUtil.toJson(map);
+
+				Host existingHost = dataCenter.getHosts().stream()
+						.filter(h -> isEqual(h.getName(), name) && isEqual(h.getIpAddress(), ipAddress)).findFirst()
+						.orElse(null);
+				if (existingHost != null) {
+					existingHost.setDetailsInJson(details);
+					hosts.add(existingHost);
+				} else {
+					Host host = Host.builder().name(name).ipAddress(ipAddress).dataCenter(dataCenter)
+							.detailsInJson(details).build();
+					hosts.add(host);
+				}
+			});
+			
+			dataCenter.getHosts().clear();
+			dataCenter.getHosts().addAll(hosts);
+		}
+		return hosts;
+	}
+
+
+
+
+
+	private DataCenter parseExcelContent(Workbook workbook, BigInteger dcId) throws Exception {
+		Optional<DataCenter> dataCenterOpt = service.findById(dcId);
+		if(!dataCenterOpt.isPresent()) {
+			throw new Exception("DataCenter for which template is being uploaded is not present in the system.");
+		}
+		DataCenter dataCenter =  dataCenterOpt.get();
+		//parse hosts
+		List<LinkedHashMap<String, Object>> hostSheet = workbook.getData().get(mapper.getHostSheet());
+		parseHost(hostSheet, dataCenter);
+		if(CollectionUtils.isNotEmpty(hostSheet)) {
+			dataCenter.setPhase(Phase.ASSESSMENT);			
+		}
+		//parse processes
+		List<LinkedHashMap<String, Object>> processSheet = workbook.getData().get(mapper.getProcessSheet());
+		parseProcess(processSheet, dataCenter.getHosts());
+		dataCenter = service.save(dataCenter);
+	
+	//=====================================================================================================================//	
+		//parse applications
+		List<LinkedHashMap<String, Object>> applicationSheet = workbook.getData().get(mapper.getApplicationSheet());
+		List<Application> oldApps = appRepository.findByDataCenter(dataCenter);
+		List<Application> newApps = parseApplication(applicationSheet, dataCenter.getHosts(), oldApps, dataCenter);
+		oldApps.removeAll(newApps);
+		List<Application> apps = appRepository.saveAllAndFlush(newApps);
+		if(CollectionUtils.isNotEmpty(apps)) {
+			client.createApplicationSurveyor(apps.stream().map(a -> a.toCommonApp()).toList());
+		}
+		if(CollectionUtils.isNotEmpty(oldApps)) {
+			appRepository.deleteAll(oldApps);
+			client.deleteApplicationSurveyor(oldApps.stream().map(a -> a.toCommonApp()).toList());
+		}
+		
+		//Save dc
+//		dataCenter = service.save(dataCenter);
+//
+//		//Remove orphan applications
+//		if(CollectionUtils.isNotEmpty(oldAppsSet)) {
+//			for (Application app : oldAppsSet) {
+//				app.getAppHosts().clear();
+//			}
+//		}
+//		
+//		appRepository.deleteAll(oldAppsSet);
+		
+		dataCenterOpt = service.findById(dcId);
+		if(!dataCenterOpt.isPresent()) {
+			throw new Exception("DataCenter for which template is being uploaded is not present in the system.");
+		}
+		dataCenter =  dataCenterOpt.get();
+		
+		return dataCenter;
+	}
