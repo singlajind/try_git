@@ -1,9 +1,16 @@
-<select name="items" id="items">
-    <option th:each="entry : ${labelToValues}"
-            th:value="${#strings.arrayJoin(entry.value.toArray(), ',')}"
-            th:text="${entry.key}">
-    </option>
-</select>
+<div th:if="${#lists.isNotEmpty(labelToValues)}">
+    <select name="items" id="items">
+        <!-- Default "All" option -->
+        <option value="ALL">All</option>
+
+        <!-- Other options from the map -->
+        <option th:each="entry : ${labelToValues}"
+                th:value="${#strings.arrayJoin(entry.value.toArray(), ',')}"
+                th:text="${entry.key}">
+        </option>
+    </select>
+</div>
+
 
 <dependency>
 			<groupId>org.apache.poi</groupId>
