@@ -1,3 +1,10 @@
+<select name="items" id="items">
+    <option th:each="entry : ${labelToValues}"
+            th:value="${#strings.arrayJoin(entry.value.toArray(), ',')}"
+            th:text="${entry.key}">
+    </option>
+</select>
+
 <dependency>
 			<groupId>org.apache.poi</groupId>
 			<artifactId>poi</artifactId>
