@@ -1,3 +1,11 @@
+SELECT *
+FROM (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY colA ORDER BY NEWID()) AS rn
+  FROM your_table
+) t
+WHERE rn = 1;
+
+
 <div th:if="${#lists.isNotEmpty(labelToValues)}">
     <select name="items" id="items">
         <!-- Default "All" option -->
