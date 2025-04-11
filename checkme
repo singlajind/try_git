@@ -1,3 +1,36 @@
+WITH Ranked AS (
+    SELECT *,
+           ROW_NUMBER() OVER (
+               PARTITION BY colA, colB, colC
+               ORDER BY NEWID()
+           ) AS rn
+    FROM TableName
+),
+Deduped AS (
+    SELECT colA, colB, colC, colD
+    FROM Ranked
+    WHERE rn = 1
+),
+PickOnePerColA AS (
+    SELECT a.*
+    FROM Deduped a
+    OUTER APPLY (
+        SELECT TOP 1 b.*
+        FROM Deduped b
+        WHERE b.colA = a.colA
+          AND NOT EXISTS (
+              SELECT 1 FROM Deduped c
+              WHERE c.colA <> b.colA AND (c.colB = b.colB OR c.colC = b.colC)
+          )
+        ORDER BY NEWID()
+    ) AS match
+)
+SELECT DISTINCT colA, colB, colC, colD
+FROM PickOnePerColA;
+
+
+
+
 SELECT *
 FROM (
   SELECT *, ROW_NUMBER() OVER (PARTITION BY colA ORDER BY NEWID()) AS rn
