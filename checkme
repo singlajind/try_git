@@ -1,3 +1,87 @@
+CREATE PROCEDURE usp_GetDiverseRandomRows
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Track final results
+    CREATE TABLE #Result (
+        colA INT,
+        colB VARCHAR(100),
+        colC VARCHAR(100),
+        colD VARCHAR(100)
+    );
+
+    -- Track used colB/colC values
+    CREATE TABLE #Used (
+        colB VARCHAR(100),
+        colC VARCHAR(100)
+    );
+
+    -- Cursor over distinct colA values
+    DECLARE colA_cursor CURSOR FOR
+        SELECT DISTINCT colA FROM TableName;
+
+    DECLARE @colA INT;
+
+    OPEN colA_cursor;
+    FETCH NEXT FROM colA_cursor INTO @colA;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        -- Try to find a row with new colB/colC
+        ;WITH Candidates AS (
+            SELECT *
+            FROM TableName
+            WHERE colA = @colA
+        ),
+        NotUsed AS (
+            SELECT TOP 1 *
+            FROM Candidates c
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM #Used u
+                WHERE u.colB = c.colB OR u.colC = c.colC
+            )
+            ORDER BY NEWID()
+        )
+        -- Try to use NotUsed row first, fallback otherwise
+        INSERT INTO #Result (colA, colB, colC, colD)
+        SELECT TOP 1 colA, colB, colC, colD
+        FROM NotUsed
+
+        -- Fallback if no NotUsed row found
+        IF @@ROWCOUNT = 0
+        BEGIN
+            INSERT INTO #Result (colA, colB, colC, colD)
+            SELECT TOP 1 colA, colB, colC, colD
+            FROM TableName
+            WHERE colA = @colA
+            ORDER BY NEWID();
+        END
+
+        -- Insert picked values into #Used
+        INSERT INTO #Used (colB, colC)
+        SELECT r.colB, r.colC
+        FROM #Result r
+        WHERE r.colA = @colA;
+
+        FETCH NEXT FROM colA_cursor INTO @colA;
+    END
+
+    CLOSE colA_cursor;
+    DEALLOCATE colA_cursor;
+
+    -- Return final results
+    SELECT * FROM #Result;
+
+    DROP TABLE #Result;
+    DROP TABLE #Used;
+END;
+
+
+
+
+
 WITH Ranked AS (
     SELECT *,
            ROW_NUMBER() OVER (
