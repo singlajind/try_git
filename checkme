@@ -1,3 +1,18 @@
+@Scheduled(fixedRate = 5 * 60 * 1000) // Every 5 minutes
+    public void callExternalApi() {
+        String url = "https://your-api-url.com/endpoint";
+
+        try {
+            String response = restTemplate.getForObject(url, String.class);
+            System.out.println("API Response: " + response);
+        } catch (Exception e) {
+            System.err.println("Error calling API: " + e.getMessage());
+        }
+    }
+
+
+
+
 function checkMatch(X, Y) {
   if (!X || X.length === 0) {
     return true; // if X is null/undefined/empty, return true
