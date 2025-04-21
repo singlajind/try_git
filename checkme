@@ -1,3 +1,60 @@
+<configuration>
+
+    <appender name="ClassAAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/classA.log</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/classA.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <appender name="ClassBAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/classB.log</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/classB.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <!-- Logger for ClassA -->
+    <logger name="com.example.demo.ClassA" level="DEBUG" additivity="false">
+        <appender-ref ref="ClassAAppender" />
+    </logger>
+
+    <!-- Logger for ClassB -->
+    <logger name="com.example.demo.ClassB" level="DEBUG" additivity="false">
+        <appender-ref ref="ClassBAppender" />
+    </logger>
+
+    <!-- Root logger (optional if you want general logs) -->
+    <root level="INFO">
+        <!-- You can add a console appender here if you want -->
+    </root>
+
+</configuration>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 @Scheduled(fixedRate = 5 * 60 * 1000) // Every 5 minutes
     public void callExternalApi() {
         String url = "https://your-api-url.com/endpoint";
