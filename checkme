@@ -1,43 +1,70 @@
-<configuration>
-    <!-- Default console appender -->
-    <appender name="Console" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
+CREATE PROCEDURE ref.UpdateAndInsertB
+AS
+BEGIN
+    SET NOCOUNT ON;
 
-    <!-- File appender for the general application logs -->
-    <appender name="AppFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/application.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>logs/application.%d{yyyy-MM-dd}.log</fileNamePattern>
-            <maxHistory>30</maxHistory>
-        </rollingPolicy>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
+    DECLARE @currentDate DATETIME = GETDATE();
 
-    <!-- File appender for the specific class -->
-    <appender name="SpecialClassFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/special-class.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>logs/special-class.%d{yyyy-MM-dd}.log</fileNamePattern>
-            <maxHistory>30</maxHistory>
-        </rollingPolicy>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
+    BEGIN TRY
+        BEGIN TRANSACTION;
 
-    <!-- Root logger (for everything) -->
-    <root level="INFO">
-        <appender-ref ref="Console" />
-        <appender-ref ref="AppFile" />
-    </root>
+        -- Step 0: Create a temp table to store CTE results
+        CREATE TABLE #TempA (
+            Id INT PRIMARY KEY,
+            Value NVARCHAR(255) -- Adjust the datatype/size to match your real Value column
+        );
 
-    <!-- Logger for your special class -->
-    <logger name="com.example.yourpackage.YourSpecialClass" level="DEBUG" additivity="false">
-        <appender-ref ref="SpecialClassFile" />
-    </logger>
-</configuration>
+        -- Step 1: Insert CTE result into #TempA
+        INSERT INTO #TempA (Id, Value)
+        -- your CTE and SELECT
+        WITH CTE_A AS (
+            SELECT 
+                Id,
+                Value
+            FROM 
+                ref.SomeOtherTable
+            WHERE 
+                SomeCondition = 1
+        )
+        SELECT 
+            Id,
+            Value
+        FROM 
+            CTE_A;
+
+        -- Step 2: Update existing active records based on #TempA
+        UPDATE B
+        SET 
+            B.EndDate = @currentDate,
+            B.IsActive = 0
+        FROM 
+            ref.B AS B
+        INNER JOIN 
+            #TempA AS A ON A.Id = B.AID
+        WHERE 
+            B.IsActive = 1;
+
+        -- Step 3: Insert new records into B
+        INSERT INTO ref.B (AID, Value, StartDate, EndDate, IsActive)
+        SELECT 
+            A.Id,
+            A.Value,
+            @currentDate,
+            NULL,
+            1
+        FROM 
+            #TempA AS A;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+
+        -- Optional: re-throw the error
+        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+        DECLARE @ErrorSeverity INT = ERROR_SEVERITY();
+        DECLARE @ErrorState INT = ERROR_STATE();
+
+        RAISERROR (@ErrorMessage, @ErrorSeverity, @ErrorState);
+    END CATCH
+END;
