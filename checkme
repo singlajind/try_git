@@ -1,3 +1,65 @@
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+public class ExcelAppender {
+    public static void main(String[] args) throws Exception {
+        String filePath = "path/to/your/existing.xlsx";
+        double valueCol2 = 123.45; // Your input value for column 2
+        double valueCol3 = 67.89;  // Your input value for column 3
+
+        FileInputStream fis = new FileInputStream(filePath);
+        Workbook workbook = new XSSFWorkbook(fis);
+        Sheet sheet = workbook.getSheetAt(0);
+
+        int lastRowNum = sheet.getLastRowNum();
+        Row previousRow = sheet.getRow(lastRowNum);
+        Row newRow = sheet.createRow(lastRowNum + 1);
+
+        CreationHelper createHelper = workbook.getCreationHelper();
+
+        // Column 1 - today's date
+        Cell cell0 = newRow.createCell(0);
+        cell0.setCellValue(new Date());
+        CellStyle dateStyle = workbook.createCellStyle();
+        short dateFormat = createHelper.createDataFormat().getFormat("yyyy-mm-dd");
+        dateStyle.setDataFormat(dateFormat);
+        cell0.setCellStyle(dateStyle);
+
+        // Column 2
+        newRow.createCell(1).setCellValue(valueCol2);
+
+        // Column 3
+        newRow.createCell(2).setCellValue(valueCol3);
+
+        // Column 4 and 5 - copy formulas from previous row if available
+        for (int i = 3; i <= 4; i++) {
+            Cell oldCell = previousRow.getCell(i);
+            if (oldCell != null && oldCell.getCellTypeEnum() == CellType.FORMULA) {
+                Cell newCell = newRow.createCell(i);
+                newCell.setCellFormula(oldCell.getCellFormula().replaceAll("\\d+", String.valueOf(lastRowNum + 1)));
+            }
+        }
+
+        fis.close();
+
+        // Write back to the file
+        FileOutputStream fos = new FileOutputStream(filePath);
+        workbook.write(fos);
+        fos.close();
+        workbook.close();
+
+        System.out.println("Row appended successfully.");
+    }
+}
+
+
+
+
+
 CREATE PROCEDURE ref.UpdateAndInsertB
 AS
 BEGIN
