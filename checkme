@@ -1,3 +1,6 @@
+IF DATEDIFF('day', [Date], TODAY()) <= 6 THEN [Username] END
+
+
 IF [Days Ago] <= 6 THEN 'Last 7 Days'
 ELSEIF [Days Ago] <= 29 THEN 'Last 30 Days'
 ELSEIF [Days Ago] <= 89 THEN 'Last 90 Days'
