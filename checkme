@@ -1,9 +1,76 @@
-IF DATEDIFF('day', [Date], TODAY()) <= 6 THEN [Username] END
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
+import javax.mail.Message;
+import javax.mail.MessagingException;
+import javax.mail.Session;
+import javax.mail.internet.*;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Properties;
+import java.util.UUID;
 
-IF [Days Ago] <= 6 THEN 'Last 7 Days'
-ELSEIF [Days Ago] <= 29 THEN 'Last 30 Days'
-ELSEIF [Days Ago] <= 89 THEN 'Last 90 Days'
-ELSE NULL
-END
+@Service
+public class CalendarInviteDirectService {
 
+    @Autowired
+    private JavaMailSender mailSender;
+
+    public void sendAllDayEventInviteDirect(String recipientEmail) throws MessagingException {
+        Session session = mailSender.getSession(); // get JavaMail session from Spring Boot
+        MimeMessage message = new MimeMessage(session);
+
+        message.setFrom(new InternetAddress("your-email@yourdomain.com"));
+        message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(recipientEmail));
+        message.setSubject("Company Annual Day");
+
+        LocalDate eventDate = LocalDate.of(2025, 6, 15);
+        String startDate = eventDate.format(DateTimeFormatter.BASIC_ISO_DATE);
+        String endDate = eventDate.plusDays(1).format(DateTimeFormatter.BASIC_ISO_DATE);
+        String uid = UUID.randomUUID().toString();
+
+        String icsContent = "BEGIN:VCALENDAR\n" +
+                "PRODID:-//Company Inc//Spring Boot Calendar//EN\n" +
+                "VERSION:2.0\n" +
+                "CALSCALE:GREGORIAN\n" +
+                "METHOD:REQUEST\n" +
+                "BEGIN:VEVENT\n" +
+                "UID:" + uid + "\n" +
+                "DTSTAMP:" + ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")) + "\n" +
+                "DTSTART;VALUE=DATE:" + startDate + "\n" +
+                "DTEND;VALUE=DATE:" + endDate + "\n" +
+                "SUMMARY:Company Annual Day Celebration\n" +
+                "DESCRIPTION:This is a full-day celebration event for all employees.\n" +
+                "LOCATION:Company HQ or Online\n" +
+                "ORGANIZER;CN=HR Team:mailto:your-email@yourdomain.com\n" +
+                "ATTENDEE;CN=Employee;RSVP=TRUE:mailto:" + recipientEmail + "\n" +
+                "STATUS:CONFIRMED\n" +
+                "SEQUENCE:0\n" +
+                "TRANSP:OPAQUE\n" +
+                "END:VEVENT\n" +
+                "END:VCALENDAR";
+
+        // Create calendar part as primary body part
+        MimeBodyPart calendarPart = new MimeBodyPart();
+        calendarPart.setHeader("Content-Class", "urn:content-classes:calendarmessage");
+        calendarPart.setHeader("Content-ID", "calendar_message");
+        calendarPart.setDataHandler(new DataHandler(new ByteArrayDataSource(icsContent, "text/calendar;method=REQUEST;charset=UTF-8")));
+
+        // Combine into multipart
+        MimeMultipart multipart = new MimeMultipart("alternative");
+        multipart.addBodyPart(calendarPart);
+
+        message.setContent(multipart);
+        mailSender.send(message);
+    }
+
+    // Test method (optional)
+    @PostConstruct
+    public void triggerSend() throws Exception {
+        sendAllDayEventInviteDirect("recipient@example.com");
+    }
+}
