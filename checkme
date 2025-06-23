@@ -1,38 +1,65 @@
-CASE 
-    WHEN CHARINDEX(':', your_column) > 0 AND CHARINDEX('\', your_column) > CHARINDEX(':', your_column)
-      THEN SUBSTRING(
-             your_column,
-             CHARINDEX(':', your_column) + 1,
-             CHARINDEX('\', your_column) - CHARINDEX(':', your_column) - 1
-           )
-    ELSE your_column
-  END AS result_value
+# SMTP Configuration
+$smtpServer = "smtp.yourserver.com"
+$smtpPort = 587
+$smtpFrom = "noreply@yourdomain.com"
+$smtpUser = "noreply@yourdomain.com"
+$smtpPass = "yourSmtpPassword"
 
+# SQL Configuration
+$connectionString = "Server=YOUR_SQL_SERVER;Database=YOUR_DATABASE;Integrated Security=True"
+# Use below instead if using SQL auth:
+# $connectionString = "Server=YOUR_SQL_SERVER;Database=YOUR_DATABASE;User Id=USERNAME;Password=PASSWORD;"
 
+# Load data from view V1
+$query = "SELECT email, subject, body FROM V1"
 
-# Define parameters
-$eventTitle = "Company Offsite"
-$eventDate = Get-Date "2025-07-15"  # All-day event date
-$recipient = "recipient@example.com"
+# Load SQL data
+$connection = New-Object System.Data.SqlClient.SqlConnection $connectionString
+$command = $connection.CreateCommand()
+$command.CommandText = $query
+$connection.Open()
+$reader = $command.ExecuteReader()
 
-# Create Outlook COM object
-$outlook = New-Object -ComObject Outlook.Application
-$appointment = $outlook.CreateItem(1)  # 1 = olAppointmentItem
+# Create DataTable from reader
+$table = New-Object System.Data.DataTable
+$table.Load($reader)
+$connection.Close()
 
-# Configure the appointment
-$appointment.Subject = $eventTitle
-$appointment.Start = $eventDate
-$appointment.AllDayEvent = $true
-$appointment.MeetingStatus = 1  # 1 = olMeeting
-$appointment.Location = ""      # Optional
-$appointment.Body = ""          # No body
+# Loop through each row and send email
+foreach ($row in $table.Rows) {
+    $email = $row["email"]
+    $subject = $row["subject"]
+    $body = $row["body"]
 
-# Add recipient
-$recipientObj = $appointment.Recipients.Add($recipient)
-$recipientObj.Type = 1  # 1 = Required attendee
+    try {
+        # Send email
+        $mail = New-Object System.Net.Mail.MailMessage
+        $mail.From = $smtpFrom
+        $mail.To.Add($email)
+        $mail.Subject = $subject
+        $mail.Body = $body
+        $mail.IsBodyHtml = $true
 
-# Resolve and send
-$appointment.Recipients.ResolveAll() | Out-Null
-$appointment.Send()
+        $smtp = New-Object Net.Mail.SmtpClient($smtpServer, $smtpPort)
+        $smtp.EnableSsl = $true
+        $smtp.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
+        $smtp.Send($mail)
 
-Write-Host "Meeting invite sent for $eventDate to $recipient"
+        # Insert log into emailLog table
+        $logQuery = "INSERT INTO emailLog (email, subject, body) VALUES (@Email, @Subject, @Body)"
+        $logConnection = New-Object System.Data.SqlClient.SqlConnection $connectionString
+        $logCommand = $logConnection.CreateCommand()
+        $logCommand.CommandText = $logQuery
+        $logCommand.Parameters.AddWithValue("@Email", $email)
+        $logCommand.Parameters.AddWithValue("@Subject", $subject)
+        $logCommand.Parameters.AddWithValue("@Body", $body)
+        $logConnection.Open()
+        $logCommand.ExecuteNonQuery()
+        $logConnection.Close()
+
+        Write-Output "Email sent and logged for $email"
+    }
+    catch {
+        Write-Warning "Failed to send email to $email - $_"
+    }
+}
