@@ -1,3 +1,5 @@
+-ExecutionPolicy Bypass -File "C:\Scripts\myScript.ps1"
+
 @Entity
 @Table(name = "active_users_view")
 public class ActiveUserView {
