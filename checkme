@@ -1,80 +1,16 @@
-RestTemplate restTemplate = new RestTemplate();
+@Entity
+@Table(name = "active_users_view")
+public class ActiveUserView {
 
-        ParameterizedTypeReference<Map<String, Map<String, List<String>>>> typeRef =
-                new ParameterizedTypeReference<Map<String, Map<String, List<String>>>>() {};
+    @Id
+    private Long id;
 
-        ResponseEntity<Map<String, Map<String, List<String>>>> response =
-                restTemplate.exchange(url, HttpMethod.GET, null, typeRef);
+    private String name;
 
-        Map<String, Map<String, List<String>>> result = response.getBody();
+    private String email;
 
-        // You can now use `result` as needed
-        System.out.println(result);
+    // only the columns returned by the view
+}
 
-
-
-# SMTP Configuration
-$smtpServer = "smtp.yourserver.com"
-$smtpPort = 587
-$smtpFrom = "noreply@yourdomain.com"
-$smtpUser = "noreply@yourdomain.com"
-$smtpPass = "yourSmtpPassword"
-
-# SQL Configuration
-$connectionString = "Server=YOUR_SQL_SERVER;Database=YOUR_DATABASE;Integrated Security=True"
-# Use below instead if using SQL auth:
-# $connectionString = "Server=YOUR_SQL_SERVER;Database=YOUR_DATABASE;User Id=USERNAME;Password=PASSWORD;"
-
-# Load data from view V1
-$query = "SELECT email, subject, body FROM V1"
-
-# Load SQL data
-$connection = New-Object System.Data.SqlClient.SqlConnection $connectionString
-$command = $connection.CreateCommand()
-$command.CommandText = $query
-$connection.Open()
-$reader = $command.ExecuteReader()
-
-# Create DataTable from reader
-$table = New-Object System.Data.DataTable
-$table.Load($reader)
-$connection.Close()
-
-# Loop through each row and send email
-foreach ($row in $table.Rows) {
-    $email = $row["email"]
-    $subject = $row["subject"]
-    $body = $row["body"]
-
-    try {
-        # Send email
-        $mail = New-Object System.Net.Mail.MailMessage
-        $mail.From = $smtpFrom
-        $mail.To.Add($email)
-        $mail.Subject = $subject
-        $mail.Body = $body
-        $mail.IsBodyHtml = $true
-
-        $smtp = New-Object Net.Mail.SmtpClient($smtpServer, $smtpPort)
-        $smtp.EnableSsl = $true
-        $smtp.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
-        $smtp.Send($mail)
-
-        # Insert log into emailLog table
-        $logQuery = "INSERT INTO emailLog (email, subject, body) VALUES (@Email, @Subject, @Body)"
-        $logConnection = New-Object System.Data.SqlClient.SqlConnection $connectionString
-        $logCommand = $logConnection.CreateCommand()
-        $logCommand.CommandText = $logQuery
-        $logCommand.Parameters.AddWithValue("@Email", $email)
-        $logCommand.Parameters.AddWithValue("@Subject", $subject)
-        $logCommand.Parameters.AddWithValue("@Body", $body)
-        $logConnection.Open()
-        $logCommand.ExecuteNonQuery()
-        $logConnection.Close()
-
-        Write-Output "Email sent and logged for $email"
-    }
-    catch {
-        Write-Warning "Failed to send email to $email - $_"
-    }
+public interface ActiveUserViewRepository extends JpaRepository<ActiveUserView, Long> {
 }
