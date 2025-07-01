@@ -1,3 +1,18 @@
+RestTemplate restTemplate = new RestTemplate();
+
+        ParameterizedTypeReference<Map<String, Map<String, List<String>>>> typeRef =
+                new ParameterizedTypeReference<Map<String, Map<String, List<String>>>>() {};
+
+        ResponseEntity<Map<String, Map<String, List<String>>>> response =
+                restTemplate.exchange(url, HttpMethod.GET, null, typeRef);
+
+        Map<String, Map<String, List<String>>> result = response.getBody();
+
+        // You can now use `result` as needed
+        System.out.println(result);
+
+
+
 # SMTP Configuration
 $smtpServer = "smtp.yourserver.com"
 $smtpPort = 587
