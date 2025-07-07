@@ -1,3 +1,37 @@
+
+
+
+
+
+
+
+
+
+
+@Value("classpath:Pt.xlsx")
+	private Resource template;
+
+public byte[] generateOutputBytes(BigInteger projectId) throws IOException {
+		ProjectDetail p = prepo.getProjectAllLoaded(projectId);
+		try(ByteArrayOutputStream os = new ByteArrayOutputStream()){ 
+//			try(InputStream is = new FileInputStream("C:\\Users\\amit1665\\OneDrive - Nagarro\\Desktop\\Pt.xlsx")) {
+			try(InputStream is = template.getInputStream()) {
+				Context ctx = new Context();
+				ctx.putVar("wrapper", new ProjectExcelWrapper(p));
+				JxlsHelper.getInstance().processTemplate(is, os, ctx);
+				return os.toByteArray();
+			}
+		}
+	}
+
+
+
+
+
+
+
+
+
 Start-Sleep -Seconds 10
 
 $response = Invoke-RestMethod -Uri "https://api.example.com/endpoint" -Method GET
