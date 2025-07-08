@@ -1,4 +1,7 @@
-
+Configuration cfg = new Configuration(Configuration.VERSION_2_3_31);
+        cfg.setDirectoryForTemplateLoading(new File(templateDir));
+        cfg.setDefaultEncoding("UTF-8");
+        cfg.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
 
 
 
