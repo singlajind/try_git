@@ -1,3 +1,51 @@
-Comparator
-    .comparing((Animal a) -> !a.getName().toLowerCase().contains("cfd"))
-    .thenComparing(Animal::getDescription)
+import java.io.*;
+import java.nio.file.*;
+import java.util.regex.*;
+
+public class CommentRemover {
+
+    // Pattern to match /* number */
+    private static final Pattern PATTERN = Pattern.compile("^\s*/\*\s*\d+\s*\*/\s*");
+
+    public static void main(String[] args) {
+        // Specify the directory to scan
+        String directoryPath = "C:/your/folder/path"; // Change this
+
+        try {
+            Files.walk(Paths.get(directoryPath))
+                .filter(Files::isRegularFile)
+                .filter(path -> path.toString().endsWith(".java")) // Optional: filter by file type
+                .forEach(CommentRemover::processFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void processFile(Path filePath) {
+        try {
+            File file = filePath.toFile();
+            File tempFile = new File(file.getAbsolutePath() + ".tmp");
+
+            try (BufferedReader reader = new BufferedReader(new FileReader(file));
+                 BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile))) {
+
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    // Remove matching pattern from beginning
+                    String modifiedLine = PATTERN.matcher(line).replaceFirst("");
+                    writer.write(modifiedLine);
+                    writer.newLine();
+                }
+            }
+
+            // Replace original file with modified temp file
+            if (!file.delete() || !tempFile.renameTo(file)) {
+                System.err.println("Failed to replace file: " + file.getAbsolutePath());
+            }
+
+        } catch (IOException e) {
+            System.err.println("Error processing file: " + filePath);
+            e.printStackTrace();
+        }
+    }
+}
