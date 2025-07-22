@@ -1,46 +1,186 @@
-import java.io.*;
-import java.nio.file.*;
-import java.util.regex.*;
+<!DOCTYPE html>
+<html lang="en">
 
-public class CommentRemover {
-
-    // Matches: /*123*/, /*   */, /*   45  */, etc., at line start
-    private static final Pattern PATTERN = Pattern.compile("^\\s*/\\*\\s*\\d*\\s*\\*/\\s*");
-
-    public static void main(String[] args) {
-        String directoryPath = "C:/your/folder/path"; // <-- Change this
-
-        try {
-            Files.walk(Paths.get(directoryPath))
-                 .filter(Files::isRegularFile)
-                 .forEach(CommentRemover::processFile);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static void processFile(Path filePath) {
-        File file = filePath.toFile();
-        File tempFile = new File(file.getAbsolutePath() + ".tmp");
-
-        try (
-            BufferedReader reader = new BufferedReader(new FileReader(file));
-            BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile))
-        ) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String modifiedLine = PATTERN.matcher(line).replaceFirst("");
-                writer.write(modifiedLine);
-                writer.newLine();
-            }
-        } catch (IOException e) {
-            System.err.println("Error processing file: " + filePath);
-            e.printStackTrace();
-            return;
+<head>
+    <meta charset="UTF-8">
+    <title>My Calendar Meeting</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
         }
 
-        if (!file.delete() || !tempFile.renameTo(file)) {
-            System.err.println("Failed to replace file: " + file.getAbsolutePath());
+        header,
+        footer {
+            background-color: #000;
+            color: white;
+            padding: 10px 20px;
+            position: relative;
         }
-    }
-}
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .content {
+            position: relative;
+            padding: 20px;
+        }
+
+        .content::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            border-top: 30px solid black;
+            border-right: 30px solid transparent;
+        }
+
+        .header-title {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        .header-logo {
+            position: absolute;
+            right: 20px;
+        }
+
+        .header-logo img {
+            height: 40px;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+        }
+
+        footer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .footer-center {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .footer-right {
+            margin-left: auto;
+        }
+
+        .footer-right a {
+            color: white;
+            text-decoration: none;
+        }
+
+        .thank-you {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #000;
+            text-align: left;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: #000;
+            color: white;
+        }
+
+        th,
+        td {
+            border: 1px solid #444;
+            padding: 10px;
+            text-align: left;
+        }
+
+        .table-title {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: #111;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="header-title">MY Calendar Meeting</div>
+        <div class="header-logo">
+            <img src="https://via.placeholder.com/100x40?text=Logo" alt="Logo">
+        </div>
+    </header>
+
+    <div class="content">
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+        <p>Donec in sem vel erat pulvinar gravida et nec metus.</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th colspan="3" class="table-title">Upcoming Meetings</th>
+                </tr>
+                <tr>
+                    <th>Meeting Title</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Team Sync</td>
+                    <td>2025-07-23</td>
+                    <td>10:00 AM</td>
+                </tr>
+                <tr>
+                    <td>Project Update</td>
+                    <td>2025-07-24</td>
+                    <td>2:00 PM</td>
+                </tr>
+                <tr>
+                    <td>Client Call</td>
+                    <td>2025-07-25</td>
+                    <td>5:00 PM</td>
+                </tr>
+            </tbody>
+        </table>
+
+    </div>
+    <div class="thank-you">
+        Thank you<br>Team Android
+    </div>
+    <footer>
+        <div class="footer-center">Powered by Android</div>
+        <div class="footer-right">
+            <a href="mailto:contact@example.com">Contact Us</a>
+        </div>
+    </footer>
+
+</body>
+
+</html>
