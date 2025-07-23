@@ -1,40 +1,81 @@
-import java.util.*;
-import java.util.stream.Collectors;
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Email Report</title>
+  </head>
+  <body style="margin:0; padding:0; font-family: Arial, sans-serif; background-color: #ffffff;">
 
-public class GroupAnames {
-    public static void main(String[] args) {
-        Map<String, Map<String, List<String>>> originalMap = new HashMap<>();
+    <!-- Header -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #000000; color: #ffffff;">
+      <tr>
+        <td width="75%" align="center" style="padding: 10px; font-size: 20px;">
+          <strong>Header Title</strong>
+        </td>
+        <td width="25%" align="right" style="padding: 10px;">
+          <img src="https://via.placeholder.com/100x40?text=Logo" alt="Logo" style="display:block;">
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" align="right" style="padding: 0 10px 10px 0; font-size: 14px;">
+          <a href="mailto:support@example.com" style="color: #ffffff; text-decoration: none;">Contact Us</a>
+        </td>
+      </tr>
+    </table>
 
-        // Example data
-        originalMap.put("A1", Map.of("B1", Arrays.asList("C1", "C2"), "B2", Arrays.asList("C3")));
-        originalMap.put("A2", Map.of("B2", Arrays.asList("C3"), "B1", Arrays.asList("C2", "C1"))); // same as A1
-        originalMap.put("A3", Map.of("B1", Arrays.asList("C1")));
+    <!-- Decorative Top-Left Triangle -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td>
+          <table cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="width: 0; height: 0; border-left: 20px solid black; border-bottom: 20px solid transparent;"></td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
-        // Grouping result
-        Map<String, List<String>> grouped = new HashMap<>();
+    <!-- Table with dynamic data -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; margin-top: 10px;">
+      <!-- Merged header row -->
+      <tr>
+        <td colspan="${columns?size}" align="center" style="background-color: #000000; color: #ffffff; padding: 10px; font-size: 16px;">
+          <strong>Data Report</strong>
+        </td>
+      </tr>
 
-        for (Map.Entry<String, Map<String, List<String>>> entry : originalMap.entrySet()) {
-            String aName = entry.getKey();
-            Map<String, List<String>> bMap = entry.getValue();
+      <!-- Table headers -->
+      <tr style="background-color: #f2f2f2;">
+        <#list columns as col>
+          <th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">${col?cap_first}</th>
+        </#list>
+      </tr>
 
-            // Normalize: sort keys and sort cNames inside each list
-            String normalizedKey = normalizeMap(bMap);
+      <!-- Table data -->
+      <#list dataList as item>
+        <tr>
+          <#list columns as col>
+            <td style="border: 1px solid #dddddd; padding: 8px;">
+              ${("item." + col)?eval}
+            </td>
+          </#list>
+        </tr>
+      </#list>
+    </table>
 
-            grouped.computeIfAbsent(normalizedKey, k -> new ArrayList<>()).add(aName);
-        }
+    <!-- Thank You Footer -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 30px;">
+      <tr>
+        <td align="left" style="padding: 10px; font-size: 14px;">
+          Thank you,<br>
+          Team Android
+        </td>
+      </tr>
+      <tr>
+        <td style="background-color: #000000; height: 40px;"></td>
+      </tr>
+    </table>
 
-        // Print the grouping
-        for (Map.Entry<String, List<String>> group : grouped.entrySet()) {
-            System.out.println("Group: " + group.getValue());
-        }
-    }
-
-    // Normalizes the Map<bname, List<cname>> to a sorted String
-    private static String normalizeMap(Map<String, List<String>> map) {
-        return map.entrySet().stream()
-            .sorted(Map.Entry.comparingByKey())
-            .map(e -> e.getKey() + ":" + 
-                e.getValue().stream().sorted().collect(Collectors.joining(",")))
-            .collect(Collectors.joining("|"));
-    }
-}
+  </body>
+</html>
