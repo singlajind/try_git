@@ -1,3 +1,9 @@
+<#list columns as col>
+                <td>${("item." + col)?eval}</td>
+            </#list>
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 
