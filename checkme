@@ -1,3 +1,13 @@
+File file = new File(imagePath);
+        try (FileInputStream imageInFile = new FileInputStream(file)) {
+            byte[] imageData = new byte[(int) file.length()];
+            imageInFile.read(imageData);
+
+            // Encode to Base64
+            return Base64.getEncoder().encodeToString(imageData);
+        }
+
+
 <!DOCTYPE html>
 <html>
   <head>
