@@ -1,1 +1,8 @@
-<p style="border-top:1px solid white; margin:4px 0; height:1px; line-height:1px;"></p>
+String expiryStr = new SimpleDateFormat("yyyyMMdd").format(expiry.getTime());
+
+        addOverride(overrides, "EXPIRATION_DATE", expiryStr);
+        addOverride(overrides, "DELTA", "30");
+        addOverride(overrides, "QUOTE_TYPE", "DELTA");
+        addOverride(overrides, "QUOTE_SIDE", "PUT");
+        addOverride(overrides, "IMPLIED_VOLATILITY_TYPE", "BLACK");
+        addOverride(overrides, "UNDERLYING_PRICE_TYPE", "MID");
