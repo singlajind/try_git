@@ -1,8 +1,20 @@
-String expiryStr = new SimpleDateFormat("yyyyMMdd").format(expiry.getTime());
+for (XEntity entity : entities) {
+    for (Map.Entry<String, List<String>> filterEntry : filterMap.entrySet()) {
+        String attrName = filterEntry.getKey();
+        List<String> allowedValues = filterEntry.getValue();
 
-        addOverride(overrides, "EXPIRATION_DATE", expiryStr);
-        addOverride(overrides, "DELTA", "30");
-        addOverride(overrides, "QUOTE_TYPE", "DELTA");
-        addOverride(overrides, "QUOTE_SIDE", "PUT");
-        addOverride(overrides, "IMPLIED_VOLATILITY_TYPE", "BLACK");
-        addOverride(overrides, "UNDERLYING_PRICE_TYPE", "MID");
+        String attrValue = null;
+        switch (attrName) {
+            case "a": attrValue = entity.getA(); break;
+            case "b": attrValue = entity.getB(); break;
+            case "c": attrValue = entity.getC(); break;
+            case "d": attrValue = entity.getD(); break;
+            case "e": attrValue = entity.getE(); break;
+            default: continue; // ignore unknown
+        }
+
+        if (attrValue != null && allowedValues.contains(attrValue)) {
+            result.put(attrValue, entity);
+        }
+    }
+}
