@@ -1,17 +1,18 @@
-if (targetType == BigInteger.class) {
-            if (value instanceof Number) {
-                return BigInteger.valueOf(((Number) value).longValue());
-            }
-            return new BigInteger(value.toString());
-        }
-        if (targetType == LocalDateTime.class) {
-            if (value instanceof Date) {
-                return ((Date) value).toInstant()
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDateTime();
-            }
-            if (value instanceof java.sql.Timestamp) {
-                return ((java.sql.Timestamp) value).toLocalDateTime();
-            }
-            throw new IllegalArgumentException("Cannot convert to LocalDateTime: " + value.getClass());
-        }
+InputStreamResource fis = new InputStreamResource(new ByteArrayInputStream(rs.generateOutputBytes(projectId)));
+		HttpHeaders headers = new HttpHeaders();
+		headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=ProjectData.xlsx");
+		return new ResponseEntity<>(fis, headers, HttpStatus.OK);
+
+
+public byte[] generateOutputBytes(BigInteger projectId) throws IOException {
+		ProjectDetail p = prepo.getProjectAllLoaded(projectId);
+		try(ByteArrayOutputStream os = new ByteArrayOutputStream()){ 
+//			try(InputStream is = new FileInputStream("C:\\Users\\amit1665\\OneDrive - Nagarro\\Desktop\\Pt.xlsx")) {
+			try(InputStream is = template.getInputStream()) {
+				Context ctx = new Context();
+				ctx.putVar("wrapper", new ProjectExcelWrapper(p));
+				JxlsHelper.getInstance().processTemplate(is, os, ctx);
+				return os.toByteArray();
+			}
+		}
+	}
