@@ -1,18 +1,37 @@
-InputStreamResource fis = new InputStreamResource(new ByteArrayInputStream(rs.generateOutputBytes(projectId)));
-		HttpHeaders headers = new HttpHeaders();
-		headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=ProjectData.xlsx");
-		return new ResponseEntity<>(fis, headers, HttpStatus.OK);
+CREATE PROCEDURE dbo.SP2
+AS
+BEGIN
+    SET NOCOUNT ON;
 
+    -- Table to hold combined results (must match SP1 output structure)
+    CREATE TABLE #Results (
+        Col1 DATE,
+        Col2 VARCHAR(50),
+        Col3 VARCHAR(50),
+        Extra VARCHAR(100)
+    );
 
-public byte[] generateOutputBytes(BigInteger projectId) throws IOException {
-		ProjectDetail p = prepo.getProjectAllLoaded(projectId);
-		try(ByteArrayOutputStream os = new ByteArrayOutputStream()){ 
-//			try(InputStream is = new FileInputStream("C:\\Users\\amit1665\\OneDrive - Nagarro\\Desktop\\Pt.xlsx")) {
-			try(InputStream is = template.getInputStream()) {
-				Context ctx = new Context();
-				ctx.putVar("wrapper", new ProjectExcelWrapper(p));
-				JxlsHelper.getInstance().processTemplate(is, os, ctx);
-				return os.toByteArray();
-			}
-		}
-	}
+    -- Cursor over driver table
+    DECLARE @l DATE, @x VARCHAR(50), @y VARCHAR(50);
+
+    DECLARE cur CURSOR FOR
+        SELECT l, x, y FROM YourDriverTable;
+
+    OPEN cur;
+    FETCH NEXT FROM cur INTO @l, @x, @y;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        -- Insert result of SP1 into #Results
+        INSERT INTO #Results
+        EXEC dbo.SP1 @l, @x, @y;
+
+        FETCH NEXT FROM cur INTO @l, @x, @y;
+    END
+
+    CLOSE cur;
+    DEALLOCATE cur;
+
+    -- Return combined resultset
+    SELECT * FROM #Results;
+END
