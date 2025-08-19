@@ -1,2 +1,9 @@
-DATEADD(MONTH, DATEDIFF(MONTH, 0, @ProvidedDate), 0)
-                         AND @ProvidedDate;
+const json = '[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"},{"id":3,"name":"Charlie"}]';
+
+// Parse JSON string into an array of objects
+const data = JSON.parse(json);
+
+// Extract list of values for a given field
+const names = data.map(item => item.name);
+
+console.log(names); // ["Alice", "Bob", "Charlie"]
