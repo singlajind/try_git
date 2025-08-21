@@ -1,9 +1,23 @@
-const json = '[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"},{"id":3,"name":"Charlie"}]';
+CREATE TRIGGER trg_UpdateC_OnInsertOrAChange
+ON YourTable
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
 
-// Parse JSON string into an array of objects
-const data = JSON.parse(json);
+    -- Case 1: New rows (INSERT) → always set C
+    UPDATE t
+    SET C = SYSDATETIME()
+    FROM YourTable t
+    INNER JOIN inserted i ON t.PrimaryKeyColumn = i.PrimaryKeyColumn
+    LEFT JOIN deleted d ON i.PrimaryKeyColumn = d.PrimaryKeyColumn
+    WHERE d.PrimaryKeyColumn IS NULL;  -- new row (no "before" version exists)
 
-// Extract list of values for a given field
-const names = data.map(item => item.name);
-
-console.log(names); // ["Alice", "Bob", "Charlie"]
+    -- Case 2: Existing rows where A changed → update C
+    UPDATE t
+    SET C = SYSDATETIME()
+    FROM YourTable t
+    INNER JOIN inserted i ON t.PrimaryKeyColumn = i.PrimaryKeyColumn
+    INNER JOIN deleted d ON i.PrimaryKeyColumn = d.PrimaryKeyColumn
+    WHERE i.A <> d.A;  -- A value has changed
+END
