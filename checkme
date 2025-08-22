@@ -1,51 +1,12 @@
-import java.io.FileOutputStream;
-import java.io.IOException;
-
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-
-public class ExcelGenerator {
-    public static void main(String[] args) {
-        // Create a new workbook
-        Workbook workbook = new XSSFWorkbook(); // For .xlsx, use HSSFWorkbook() for .xls
-
-        // Create a sheet
-        Sheet sheet = workbook.createSheet("Sheet1");
-
-        // Create a header row
-        Row headerRow = sheet.createRow(0);
-        Cell headerCell1 = headerRow.createCell(0);
-        headerCell1.setCellValue("ID");
-        Cell headerCell2 = headerRow.createCell(1);
-        headerCell2.setCellValue("Name");
-
-        // Add some data rows
-        Row row1 = sheet.createRow(1);
-        row1.createCell(0).setCellValue(1);
-        row1.createCell(1).setCellValue("Amit");
-
-        Row row2 = sheet.createRow(2);
-        row2.createCell(0).setCellValue(2);
-        row2.createCell(1).setCellValue("Singla");
-
-        // Autosize columns
-        sheet.autoSizeColumn(0);
-        sheet.autoSizeColumn(1);
-
-        // Write the output to file
-        try (FileOutputStream fileOut = new FileOutputStream("example.xlsx")) {
-            workbook.write(fileOut);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        // Close workbook
-        try {
-            workbook.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        System.out.println("Excel file generated successfully!");
-    }
-}
+Collections.sort(list, new Comparator<String>() {
+            public int compare(String s1, String s2) {
+                try {
+                    Date d1 = sdf.parse(s1);
+                    Date d2 = sdf.parse(s2);
+                    return d1.compareTo(d2);
+                } catch (ParseException e) {
+                    // In case of invalid format, keep as equal
+                    return 0;
+                }
+            }
+        });
