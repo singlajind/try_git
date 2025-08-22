@@ -1,12 +1,12 @@
-Collections.sort(list, new Comparator<String>() {
-            public int compare(String s1, String s2) {
-                try {
-                    Date d1 = sdf.parse(s1);
-                    Date d2 = sdf.parse(s2);
-                    return d1.compareTo(d2);
-                } catch (ParseException e) {
-                    // In case of invalid format, keep as equal
-                    return 0;
-                }
-            }
-        });
+FileInputStream fis = null;
+        FileOutputStream fos = null;
+        Workbook workbook = null;
+
+        try {
+            // Step 1: Open existing file
+            fis = new FileInputStream(filePath);
+            workbook = new XSSFWorkbook(fis);
+            fis.close(); // close input stream after loading
+
+            // Step 2: Create a new sheet (name must be unique)
+            Sheet newSheet = workbook.createSheet("MyNewSheet");
