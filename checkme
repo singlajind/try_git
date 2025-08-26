@@ -1,3 +1,9 @@
+SELECT CONVERT(VARCHAR(10), YourDateColumn, 101)       -- mm/dd/yyyy
+     + ' ' 
+     + CONVERT(VARCHAR(8), YourDateColumn, 108) AS FormattedDate
+FROM YourTable;
+
+
 CREATE TRIGGER trg_My_Test_Table_Audit
 ON My_Test_Table
 AFTER INSERT, UPDATE
