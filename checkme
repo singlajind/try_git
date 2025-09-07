@@ -1,30 +1,592 @@
-SELECT CONVERT(VARCHAR(10), YourDateColumn, 101)       -- mm/dd/yyyy
-     + ' ' 
-     + CONVERT(VARCHAR(8), YourDateColumn, 108) AS FormattedDate
-FROM YourTable;
+// Project: validate-process-app (Spring Boot 2.5.8, Java 8)
+// Files below are concatenated; create them in a standard Maven layout: src/main/java/...
 
+// ---------- pom.xml (place at project root) ----------
+/*
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi=...>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>validate-process-app</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <properties>
+    <java.version>1.8</java.version>
+    <spring.boot.version>2.5.8</spring.boot.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+*/
 
-CREATE TRIGGER trg_My_Test_Table_Audit
-ON My_Test_Table
-AFTER INSERT, UPDATE
-AS
-BEGIN
-    SET NOCOUNT ON;
+// ---------- src/main/java/com/example/validateprocess/ValidateProcessApplication.java ----------
+package com.example.validateprocess;
 
-    -- Update newly inserted rows (set CreatedDate)
-    UPDATE t
-    SET t.CreatedDate = GETDATE()
-    FROM My_Test_Table t
-    INNER JOIN inserted i ON t.PrimaryKey = i.PrimaryKey
-    LEFT JOIN deleted d ON d.PrimaryKey = i.PrimaryKey
-    WHERE d.PrimaryKey IS NULL;  -- only new rows
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-    -- Update rows where a specific column (say ColX) is updated (set ModifiedDate)
-    UPDATE t
-    SET t.ModifiedDate = GETDATE()
-    FROM My_Test_Table t
-    INNER JOIN inserted i ON t.PrimaryKey = i.PrimaryKey
-    INNER JOIN deleted d ON d.PrimaryKey = i.PrimaryKey
-    WHERE ISNULL(i.ColX, '') <> ISNULL(d.ColX, ''); -- detect actual change
-END;
-GO
+@SpringBootApplication
+public class ValidateProcessApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(ValidateProcessApplication.class, args);
+    }
+}
+
+// ---------- src/main/java/com/example/validateprocess/config/RestTemplateConfig.java ----------
+package com.example.validateprocess.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.BufferingClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestTemplate;
+
+@Configuration
+public class RestTemplateConfig {
+    @Bean
+    public RestTemplate restTemplate() {
+        RestTemplate rt = new RestTemplate(new BufferingClientHttpRequestFactory(new SimpleClientHttpRequestFactory()));
+        return rt;
+    }
+}
+
+// ---------- src/main/java/com/example/validateprocess/controller/MainController.java ----------
+package com.example.validateprocess.controller;
+
+import com.example.validateprocess.dto.*;
+import com.example.validateprocess.service.ExternalService;
+import com.example.validateprocess.service.PersistenceService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api")
+public class MainController {
+
+    private final ExternalService externalService;
+    private final PersistenceService persistenceService;
+
+    public MainController(ExternalService externalService, PersistenceService persistenceService) {
+        this.externalService = externalService;
+        this.persistenceService = persistenceService;
+    }
+
+    // First endpoint: validate inputs and pull additional info
+    @PostMapping("/validate")
+    public ResponseEntity<ValidateResponse> validate(@RequestBody ValidateRequest request) {
+        // call external validation service
+        ValidateResponse resp = externalService.validateAndPull(request);
+        if (resp == null || !resp.isValid()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ValidateResponse(false, null, "Invalid input"));
+        }
+        return ResponseEntity.ok(resp);
+    }
+
+    // Second endpoint: receive previously returned data, call another service and return all data including lists
+    @PostMapping("/process")
+    public ResponseEntity<ProcessResponse> process(@RequestBody ProcessRequest request) {
+        // call external service to get hgList and thList
+        ExternalListsResponse lists = externalService.fetchLists(request);
+        ProcessResponse response = new ProcessResponse();
+        response.setInput(request);
+        response.setHgList(lists.getHgList());
+        response.setThList(lists.getThList());
+        return ResponseEntity.ok(response);
+    }
+
+    // Cancel endpoint: persist all details + reason
+    @PostMapping("/cancel")
+    public ResponseEntity<String> cancel(@RequestBody CancelRequest request) {
+        persistenceService.saveCancelled(request);
+        return ResponseEntity.ok("cancelled and persisted");
+    }
+
+    // Confirm endpoint: persist all details + ttype & rcat (ttype/rcat stored in separate table)
+    @PostMapping("/confirm")
+    public ResponseEntity<String> confirm(@RequestBody ConfirmRequest request) {
+        persistenceService.saveConfirmed(request);
+        return ResponseEntity.ok("confirmed and persisted");
+    }
+}
+
+// ---------- src/main/java/com/example/validateprocess/dto/ValidateRequest.java ----------
+package com.example.validateprocess.dto;
+
+public class ValidateRequest {
+    private String sin;
+    private String sip;
+    private String dol;
+    private String ker;
+    private String issn;
+    private String isst;
+
+    // getters & setters
+    public String getSin() { return sin; }
+    public void setSin(String sin) { this.sin = sin; }
+    public String getSip() { return sip; }
+    public void setSip(String sip) { this.sip = sip; }
+    public String getDol() { return dol; }
+    public void setDol(String dol) { this.dol = dol; }
+    public String getKer() { return ker; }
+    public void setKer(String ker) { this.ker = ker; }
+    public String getIssn() { return issn; }
+    public void setIssn(String issn) { this.issn = issn; }
+    public String getIsst() { return isst; }
+    public void setIsst(String isst) { this.isst = isst; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/dto/PulledData.java ----------
+package com.example.validateprocess.dto;
+
+public class PulledData {
+    private String name;
+    private String address;
+    private String otherInfo;
+
+    // getters/setters
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
+    public String getOtherInfo() { return otherInfo; }
+    public void setOtherInfo(String otherInfo) { this.otherInfo = otherInfo; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/dto/ValidateResponse.java ----------
+package com.example.validateprocess.dto;
+
+public class ValidateResponse {
+    private boolean valid;
+    private PulledData pulledData;
+    private String message;
+
+    public ValidateResponse() {}
+    public ValidateResponse(boolean valid, PulledData pulledData, String message) {
+        this.valid = valid;
+        this.pulledData = pulledData;
+        this.message = message;
+    }
+
+    public boolean isValid() { return valid; }
+    public void setValid(boolean valid) { this.valid = valid; }
+    public PulledData getPulledData() { return pulledData; }
+    public void setPulledData(PulledData pulledData) { this.pulledData = pulledData; }
+    public String getMessage() { return message; }
+    public void setMessage(String message) { this.message = message; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/dto/ProcessRequest.java ----------
+package com.example.validateprocess.dto;
+
+public class ProcessRequest {
+    // Include original input fields plus pulled data
+    private String sin;
+    private String sip;
+    private String dol;
+    private String ker;
+    private String issn;
+    private String isst;
+    private PulledData pulledData;
+
+    // getters/setters
+    public String getSin() { return sin; }
+    public void setSin(String sin) { this.sin = sin; }
+    public String getSip() { return sip; }
+    public void setSip(String sip) { this.sip = sip; }
+    public String getDol() { return dol; }
+    public void setDol(String dol) { this.dol = dol; }
+    public String getKer() { return ker; }
+    public void setKer(String ker) { this.ker = ker; }
+    public String getIssn() { return issn; }
+    public void setIssn(String issn) { this.issn = issn; }
+    public String getIsst() { return isst; }
+    public void setIsst(String isst) { this.isst = isst; }
+    public PulledData getPulledData() { return pulledData; }
+    public void setPulledData(PulledData pulledData) { this.pulledData = pulledData; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/dto/HgItem.java ----------
+package com.example.validateprocess.dto;
+
+public class HgItem {
+    private String id;
+    private String desc;
+
+    public HgItem() {}
+    public HgItem(String id, String desc) { this.id = id; this.desc = desc; }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+    public String getDesc() { return desc; }
+    public void setDesc(String desc) { this.desc = desc; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/dto/ThItem.java ----------
+package com.example.validateprocess.dto;
+
+public class ThItem {
+    private String code;
+    private String value;
+
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
+    public String getValue() { return value; }
+    public void setValue(String value) { this.value = value; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/dto/ExternalListsResponse.java ----------
+package com.example.validateprocess.dto;
+
+import java.util.List;
+
+public class ExternalListsResponse {
+    private java.util.List<HgItem> hgList;
+    private java.util.List<ThItem> thList;
+
+    public java.util.List<HgItem> getHgList() { return hgList; }
+    public void setHgList(java.util.List<HgItem> hgList) { this.hgList = hgList; }
+    public java.util.List<ThItem> getThList() { return thList; }
+    public void setThList(java.util.List<ThItem> thList) { this.thList = thList; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/dto/ProcessResponse.java ----------
+package com.example.validateprocess.dto;
+
+import java.util.List;
+
+public class ProcessResponse {
+    private ProcessRequest input;
+    private List<HgItem> hgList;
+    private List<ThItem> thList;
+
+    public ProcessRequest getInput() { return input; }
+    public void setInput(ProcessRequest input) { this.input = input; }
+    public List<HgItem> getHgList() { return hgList; }
+    public void setHgList(List<HgItem> hgList) { this.hgList = hgList; }
+    public List<ThItem> getThList() { return thList; }
+    public void setThList(List<ThItem> thList) { this.thList = thList; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/dto/CancelRequest.java ----------
+package com.example.validateprocess.dto;
+
+public class CancelRequest {
+    private ProcessRequest allData;
+    private String reason;
+
+    public ProcessRequest getAllData() { return allData; }
+    public void setAllData(ProcessRequest allData) { this.allData = allData; }
+    public String getReason() { return reason; }
+    public void setReason(String reason) { this.reason = reason; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/dto/ConfirmRequest.java ----------
+package com.example.validateprocess.dto;
+
+public class ConfirmRequest {
+    private ProcessRequest allData;
+    private String ttype;
+    private String rcat;
+
+    public ProcessRequest getAllData() { return allData; }
+    public void setAllData(ProcessRequest allData) { this.allData = allData; }
+    public String getTtype() { return ttype; }
+    public void setTtype(String ttype) { this.ttype = ttype; }
+    public String getRcat() { return rcat; }
+    public void setRcat(String rcat) { this.rcat = rcat; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/service/ExternalService.java ----------
+package com.example.validateprocess.service;
+
+import com.example.validateprocess.dto.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+@Service
+public class ExternalService {
+
+    private final RestTemplate restTemplate;
+
+    @Value("${external.validation.url:http://localhost:8081/validate}")
+    private String validationUrl;
+
+    @Value("${external.lists.url:http://localhost:8082/lists}")
+    private String listsUrl;
+
+    public ExternalService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    public ValidateResponse validateAndPull(ValidateRequest req) {
+        try {
+            ResponseEntity<ValidateResponse> resp = restTemplate.postForEntity(validationUrl, req, ValidateResponse.class);
+            return resp.getBody();
+        } catch (Exception ex) {
+            // log exception in real app
+            return new ValidateResponse(false, null, "validation service error: " + ex.getMessage());
+        }
+    }
+
+    public ExternalListsResponse fetchLists(ProcessRequest req) {
+        try {
+            ResponseEntity<ExternalListsResponse> resp = restTemplate.postForEntity(listsUrl, req, ExternalListsResponse.class);
+            return resp.getBody();
+        } catch (Exception ex) {
+            // fallback to empty lists
+            ExternalListsResponse fallback = new ExternalListsResponse();
+            fallback.setHgList(new java.util.ArrayList<HgItem>());
+            fallback.setThList(new java.util.ArrayList<ThItem>());
+            return fallback;
+        }
+    }
+}
+
+// ---------- src/main/java/com/example/validateprocess/service/PersistenceService.java ----------
+package com.example.validateprocess.service;
+
+import com.example.validateprocess.dto.CancelRequest;
+import com.example.validateprocess.dto.ConfirmRequest;
+import com.example.validateprocess.entity.CancelledRecord;
+import com.example.validateprocess.entity.ConfirmedRecord;
+import com.example.validateprocess.entity.TypeCategory;
+import com.example.validateprocess.repository.CancelledRecordRepository;
+import com.example.validateprocess.repository.ConfirmedRecordRepository;
+import com.example.validateprocess.repository.TypeCategoryRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class PersistenceService {
+
+    private final CancelledRecordRepository cancelledRepo;
+    private final ConfirmedRecordRepository confirmedRepo;
+    private final TypeCategoryRepository typeCategoryRepo;
+
+    public PersistenceService(CancelledRecordRepository cancelledRepo, ConfirmedRecordRepository confirmedRepo, TypeCategoryRepository typeCategoryRepo) {
+        this.cancelledRepo = cancelledRepo;
+        this.confirmedRepo = confirmedRepo;
+        this.typeCategoryRepo = typeCategoryRepo;
+    }
+
+    @Transactional
+    public void saveCancelled(CancelRequest req) {
+        CancelledRecord r = new CancelledRecord();
+        if (req.getAllData() != null) {
+            r.setSin(req.getAllData().getSin());
+            r.setSip(req.getAllData().getSip());
+            r.setDol(req.getAllData().getDol());
+            r.setKer(req.getAllData().getKer());
+            r.setIssn(req.getAllData().getIssn());
+            r.setIsst(req.getAllData().getIsst());
+            if (req.getAllData().getPulledData() != null) {
+                r.setPulledName(req.getAllData().getPulledData().getName());
+                r.setPulledAddress(req.getAllData().getPulledData().getAddress());
+                r.setPulledOtherInfo(req.getAllData().getPulledData().getOtherInfo());
+            }
+        }
+        r.setReason(req.getReason());
+        cancelledRepo.save(r);
+    }
+
+    @Transactional
+    public void saveConfirmed(ConfirmRequest req) {
+        ConfirmedRecord r = new ConfirmedRecord();
+        if (req.getAllData() != null) {
+            r.setSin(req.getAllData().getSin());
+            r.setSip(req.getAllData().getSip());
+            r.setDol(req.getAllData().getDol());
+            r.setKer(req.getAllData().getKer());
+            r.setIssn(req.getAllData().getIssn());
+            r.setIsst(req.getAllData().getIsst());
+            if (req.getAllData().getPulledData() != null) {
+                r.setPulledName(req.getAllData().getPulledData().getName());
+                r.setPulledAddress(req.getAllData().getPulledData().getAddress());
+                r.setPulledOtherInfo(req.getAllData().getPulledData().getOtherInfo());
+            }
+        }
+        confirmedRepo.save(r);
+
+        // store ttype/rcat in separate table
+        TypeCategory t = new TypeCategory();
+        t.setTtype(req.getTtype());
+        t.setRcat(req.getRcat());
+        typeCategoryRepo.save(t);
+    }
+}
+
+// ---------- src/main/java/com/example/validateprocess/entity/CancelledRecord.java ----------
+package com.example.validateprocess.entity;
+
+import javax.persistence.*;
+
+@Entity
+public class CancelledRecord {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String sin;
+    private String sip;
+    private String dol;
+    private String ker;
+    private String issn;
+    private String isst;
+    private String pulledName;
+    private String pulledAddress;
+    private String pulledOtherInfo;
+    private String reason;
+
+    // getters/setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getSin() { return sin; }
+    public void setSin(String sin) { this.sin = sin; }
+    public String getSip() { return sip; }
+    public void setSip(String sip) { this.sip = sip; }
+    public String getDol() { return dol; }
+    public void setDol(String dol) { this.dol = dol; }
+    public String getKer() { return ker; }
+    public void setKer(String ker) { this.ker = ker; }
+    public String getIssn() { return issn; }
+    public void setIssn(String issn) { this.issn = issn; }
+    public String getIsst() { return isst; }
+    public void setIsst(String isst) { this.isst = isst; }
+    public String getPulledName() { return pulledName; }
+    public void setPulledName(String pulledName) { this.pulledName = pulledName; }
+    public String getPulledAddress() { return pulledAddress; }
+    public void setPulledAddress(String pulledAddress) { this.pulledAddress = pulledAddress; }
+    public String getPulledOtherInfo() { return pulledOtherInfo; }
+    public void setPulledOtherInfo(String pulledOtherInfo) { this.pulledOtherInfo = pulledOtherInfo; }
+    public String getReason() { return reason; }
+    public void setReason(String reason) { this.reason = reason; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/entity/ConfirmedRecord.java ----------
+package com.example.validateprocess.entity;
+
+import javax.persistence.*;
+
+@Entity
+public class ConfirmedRecord {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String sin;
+    private String sip;
+    private String dol;
+    private String ker;
+    private String issn;
+    private String isst;
+    private String pulledName;
+    private String pulledAddress;
+    private String pulledOtherInfo;
+
+    // getters/setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getSin() { return sin; }
+    public void setSin(String sin) { this.sin = sin; }
+    public String getSip() { return sip; }
+    public void setSip(String sip) { this.sip = sip; }
+    public String getDol() { return dol; }
+    public void setDol(String dol) { this.dol = dol; }
+    public String getKer() { return ker; }
+    public void setKer(String ker) { this.ker = ker; }
+    public String getIssn() { return issn; }
+    public void setIssn(String issn) { this.issn = issn; }
+    public String getIsst() { return isst; }
+    public void setIsst(String isst) { this.isst = isst; }
+    public String getPulledName() { return pulledName; }
+    public void setPulledName(String pulledName) { this.pulledName = pulledName; }
+    public String getPulledAddress() { return pulledAddress; }
+    public void setPulledAddress(String pulledAddress) { this.pulledAddress = pulledAddress; }
+    public String getPulledOtherInfo() { return pulledOtherInfo; }
+    public void setPulledOtherInfo(String pulledOtherInfo) { this.pulledOtherInfo = pulledOtherInfo; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/entity/TypeCategory.java ----------
+package com.example.validateprocess.entity;
+
+import javax.persistence.*;
+
+@Entity
+public class TypeCategory {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String ttype;
+    private String rcat;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getTtype() { return ttype; }
+    public void setTtype(String ttype) { this.ttype = ttype; }
+    public String getRcat() { return rcat; }
+    public void setRcat(String rcat) { this.rcat = rcat; }
+}
+
+// ---------- src/main/java/com/example/validateprocess/repository/CancelledRecordRepository.java ----------
+package com.example.validateprocess.repository;
+
+import com.example.validateprocess.entity.CancelledRecord;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface CancelledRecordRepository extends JpaRepository<CancelledRecord, Long> {}
+
+// ---------- src/main/java/com/example/validateprocess/repository/ConfirmedRecordRepository.java ----------
+package com.example.validateprocess.repository;
+
+import com.example.validateprocess.entity.ConfirmedRecord;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface ConfirmedRecordRepository extends JpaRepository<ConfirmedRecord, Long> {}
+
+// ---------- src/main/java/com/example/validateprocess/repository/TypeCategoryRepository.java ----------
+package com.example.validateprocess.repository;
+
+import com.example.validateprocess.entity.TypeCategory;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface TypeCategoryRepository extends JpaRepository<TypeCategory, Long> {}
+
+// ---------- src/main/resources/application.properties ----------
+/*
+spring.datasource.url=jdbc:h2:mem:db;DB_CLOSE_DELAY=-1
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.jpa.hibernate.ddl-auto=update
+
+# external service urls (set these to real endpoints)
+external.validation.url=http://localhost:8081/validate
+external.lists.url=http://localhost:8082/lists
+*/
+
+// End of concatenated files.
