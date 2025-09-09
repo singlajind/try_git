@@ -1,3 +1,23 @@
+TrustStrategy acceptingTrustStrategy = (X509Certificate[] chain, String authType) -> true;
+
+        SSLContext sslContext = SSLContextBuilder
+                .create()
+                .loadTrustMaterial(null, acceptingTrustStrategy)
+                .build();
+
+        CloseableHttpClient httpClient = HttpClients.custom()
+                .setSSLContext(sslContext)
+                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                .build();
+
+        HttpComponentsClientHttpRequestFactory requestFactory =
+                new HttpComponentsClientHttpRequestFactory(httpClient);
+
+        return new RestTemplate(requestFactory);
+
+
+
+
 // Project: validate-process-app (Spring Boot 2.5.8, Java 8)
 // Files below are concatenated; create them in a standard Maven layout: src/main/java/...
 
