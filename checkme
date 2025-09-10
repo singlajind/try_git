@@ -1,30 +1,13 @@
-import org.apache.hc.client5.http.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
-import org.apache.hc.core5.ssl.SSLContextBuilder;
-import org.apache.hc.core5.ssl.TrustStrategy;
-import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
-import org.springframework.web.client.RestTemplate;
+SSLContext sslContext = new SSLContextBuilder()
+        .loadTrustMaterial(null, (cert, authType) -> true)
+        .build();
 
-import javax.net.ssl.SSLContext;
+CloseableHttpClient httpClient = HttpClients.custom()
+        .setSSLContext(sslContext)
+        .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+        .build();
 
-public class RestTemplateNoSSL {
+HttpComponentsClientHttpRequestFactory requestFactory =
+        new HttpComponentsClientHttpRequestFactory(httpClient);
 
-    public static RestTemplate getRestTemplate() throws Exception {
-        // Trust all certificates
-        TrustStrategy acceptingTrustStrategy = (cert, authType) -> true;
-
-        SSLContext sslContext = SSLContextBuilder.create()
-                .loadTrustMaterial(null, acceptingTrustStrategy)
-                .build();
-
-        CloseableHttpClient httpClient = HttpClients.custom()
-                .setSSLContext(sslContext)
-                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-                .build();
-
-        HttpComponentsClientHttpRequestFactory requestFactory =
-                new HttpComponentsClientHttpRequestFactory(httpClient);
-
-        return new RestTemplate(requestFactory);
-    }
+RestTemplate restTemplate = new RestTemplate(requestFactory);
