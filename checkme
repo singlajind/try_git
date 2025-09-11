@@ -1,13 +1,37 @@
-SSLContext sslContext = new SSLContextBuilder()
-        .loadTrustMaterial(null, (cert, authType) -> true)
-        .build();
+@Bean
+    public RestTemplate ntlmRestTemplate() throws Exception {
+        // Trust all SSL (dev/test only)
+        SSLContext sslContext = new SSLContextBuilder()
+                .loadTrustMaterial(null, (chain, authType) -> true)
+                .build();
 
-CloseableHttpClient httpClient = HttpClients.custom()
-        .setSSLContext(sslContext)
-        .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-        .build();
+        // workstation fallback
+        String ws = (workstation != null && !workstation.isEmpty())
+                ? workstation
+                : InetAddress.getLocalHost().getHostName();
 
-HttpComponentsClientHttpRequestFactory requestFactory =
-        new HttpComponentsClientHttpRequestFactory(httpClient);
+        // Credentials provider with NTLM creds (username only, domain separated)
+        CredentialsProvider credsProvider = new BasicCredentialsProvider();
+        credsProvider.setCredentials(
+                AuthScope.ANY,
+                new NTCredentials(username, password, ws, domain)
+        );
 
-RestTemplate restTemplate = new RestTemplate(requestFactory);
+        // Prefer NTLM first
+        List<String> authPrefs = Arrays.asList(AuthSchemes.NTLM, AuthSchemes.DIGEST, AuthSchemes.BASIC);
+        RequestConfig requestConfig = RequestConfig.custom()
+                .setTargetPreferredAuthSchemes(authPrefs)
+                .build();
+
+        CloseableHttpClient httpClient = HttpClients.custom()
+                .setSSLContext(sslContext)
+                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                .setDefaultCredentialsProvider(credsProvider)
+                .setDefaultRequestConfig(requestConfig)
+                .build();
+
+        HttpComponentsClientHttpRequestFactory requestFactory =
+                new HttpComponentsClientHttpRequestFactory(httpClient);
+
+        return new RestTemplate(requestFactory);
+    }
