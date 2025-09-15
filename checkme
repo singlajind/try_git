@@ -1,37 +1,55 @@
-@Bean
-    public RestTemplate ntlmRestTemplate() throws Exception {
-        // Trust all SSL (dev/test only)
-        SSLContext sslContext = new SSLContextBuilder()
-                .loadTrustMaterial(null, (chain, authType) -> true)
-                .build();
+import javax.persistence.*;
+import java.util.List;
 
-        // workstation fallback
-        String ws = (workstation != null && !workstation.isEmpty())
-                ? workstation
-                : InetAddress.getLocalHost().getHostName();
+@Entity
+@Table(name = "my_entity")
+public class MyEntity {
 
-        // Credentials provider with NTLM creds (username only, domain separated)
-        CredentialsProvider credsProvider = new BasicCredentialsProvider();
-        credsProvider.setCredentials(
-                AuthScope.ANY,
-                new NTCredentials(username, password, ws, domain)
-        );
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // Auto-increment primary key
+    private Long id;
 
-        // Prefer NTLM first
-        List<String> authPrefs = Arrays.asList(AuthSchemes.NTLM, AuthSchemes.DIGEST, AuthSchemes.BASIC);
-        RequestConfig requestConfig = RequestConfig.custom()
-                .setTargetPreferredAuthSchemes(authPrefs)
-                .build();
+    @Column(nullable = false, length = 100)
+    private String name;
 
-        CloseableHttpClient httpClient = HttpClients.custom()
-                .setSSLContext(sslContext)
-                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-                .setDefaultCredentialsProvider(credsProvider)
-                .setDefaultRequestConfig(requestConfig)
-                .build();
+    @Column(name = "description", length = 500)
+    private String desc;
 
-        HttpComponentsClientHttpRequestFactory requestFactory =
-                new HttpComponentsClientHttpRequestFactory(httpClient);
+    // Stores List<String> in a separate table
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+        name = "my_entity_actions",
+        joinColumns = @JoinColumn(name = "entity_id")
+    )
+    @Column(name = "action")
+    private List<String> actions;
 
-        return new RestTemplate(requestFactory);
+    // --- Getters and Setters ---
+    public Long getId() {
+        return id;
     }
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getDesc() {
+        return desc;
+    }
+    public void setDesc(String desc) {
+        this.desc = desc;
+    }
+
+    public List<String> getActions() {
+        return actions;
+    }
+    public void setActions(List<String> actions) {
+        this.actions = actions;
+    }
+}
