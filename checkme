@@ -1,12 +1,7 @@
-@Scheduled(cron = "0 0 9 * * *")
-    public void sendDailyTentativeNotifications() {
-        LocalDate today = LocalDate.now();
-        List<Rlh> todayList = rlhRepository.findByTentativeDate(today);
-        emailService.sendTentativeDateNotification(todayList);
-    }
-
-
-Map<String, List<Xyz>> result = list.stream()
-            .collect(Collectors.groupingBy(
-                x -> firstNonNull(x.getA(), x.getB(), x.getC())
-            ));
+String sql = "SELECT email FROM user WHERE nid = ?";
+        try {
+            return jdbcTemplate.queryForObject(sql, new Object[]{nid}, String.class);
+        } catch (EmptyResultDataAccessException e) {
+            // No matching record found — return null
+            return null;
+        }
