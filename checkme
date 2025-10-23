@@ -4,3 +4,9 @@
         List<Rlh> todayList = rlhRepository.findByTentativeDate(today);
         emailService.sendTentativeDateNotification(todayList);
     }
+
+
+Map<String, List<Xyz>> result = list.stream()
+            .collect(Collectors.groupingBy(
+                x -> firstNonNull(x.getA(), x.getB(), x.getC())
+            ));
