@@ -1,7 +1,1 @@
-String sql = "SELECT email FROM user WHERE nid = ?";
-        try {
-            return jdbcTemplate.queryForObject(sql, new Object[]{nid}, String.class);
-        } catch (EmptyResultDataAccessException e) {
-            // No matching record found — return null
-            return null;
-        }
+spring.datasource.hikari.leak-detection-threshold=60000
