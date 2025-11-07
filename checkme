@@ -1,1 +1,25 @@
-spring.datasource.hikari.leak-detection-threshold=60000
+Map mainMap = new HashMap(); // if you know generics skip raw types
+
+Iterator outerIter = mainMap.entrySet().iterator();
+
+while (outerIter.hasNext()) {
+    Map.Entry outerEntry = (Map.Entry) outerIter.next();
+
+    String outerKey = (String) outerEntry.getKey();
+    Map innerMap = (Map) outerEntry.getValue();
+
+    // Retrieve values (could be null)
+    String isValue = (String) innerMap.get("IS");
+    String sdValue = (String) innerMap.get("SD");
+
+    // Convert null → ""
+    if (isValue == null) {
+        isValue = "";
+    }
+    if (sdValue == null) {
+        sdValue = "";
+    }
+
+    // Now you have the three values
+    System.out.println("Key = " + outerKey + ", IS = " + isValue + ", SD = " + sdValue);
+}
