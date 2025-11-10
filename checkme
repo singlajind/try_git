@@ -1,147 +1,27 @@
-public enum OpportunityType {
-    INTERNAL,
-    EXTERNAL
+public interface PropertyRepository extends JpaRepository<Property, Long> {
+    Optional<Property> findByTypeAndValue(String type, String value);
 }
-public enum Priority {
-    LOW,
-    MEDIUM,
-    HIGH
-}
-
-package com.example.demo.entity;
-
-import jakarta.persistence.*;
-import lombok.*;
-
-@Entity
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class Property {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    private String propertyName;
-    private String propertyValue;
-}
-
-@Entity
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class Opportunity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Enumerated(EnumType.STRING)
-    private OpportunityType type;   // INTERNAL / EXTERNAL
-
-    @Enumerated(EnumType.STRING)
-    private Priority priority;      // LOW / MEDIUM / HIGH
-
-    private String company;
-
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "property_id", referencedColumnName = "id")
-    private Property property;
-
-    private String notes;
-
-    private Boolean active;
-}
-
-package com.example.demo.repository;
-
-import com.example.demo.entity.Opportunity;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-public interface OpportunityRepository extends JpaRepository<Opportunity, Long> {
-}
-
-package com.example.demo.service;
-
-import com.example.demo.entity.Opportunity;
-import com.example.demo.repository.OpportunityRepository;
-import org.springframework.stereotype.Service;
-import java.util.List;
 
 @Service
-public class OpportunityService {
+public class PropertyService {
 
-    private final OpportunityRepository repository;
+    private final PropertyRepository propertyRepository;
 
-    public OpportunityService(OpportunityRepository repository) {
-        this.repository = repository;
+    public PropertyService(PropertyRepository propertyRepository) {
+        this.propertyRepository = propertyRepository;
     }
 
-    public Opportunity save(Opportunity opp) {
-        return repository.save(opp);
-    }
-
-    public List<Opportunity> findAll() {
-        return repository.findAll();
-    }
-
-    public Opportunity findById(Long id) {
-        return repository.findById(id).orElse(null);
-    }
-
-    public void delete(Long id) {
-        repository.deleteById(id);
+    @Transactional
+    public Property getOrCreate(String type, String value) {
+        // Check if property exists
+        return propertyRepository.findByTypeAndValue(type, value)
+                .orElseGet(() -> {
+                    // Create new if not exists
+                    Property p = new Property();
+                    p.setType(type);
+                    p.setValue(value);
+                    // Set default values for other fields if necessary
+                    return propertyRepository.save(p);
+                });
     }
 }
-
-
-package com.example.demo.controller;
-
-import com.example.demo.entity.Opportunity;
-import com.example.demo.service.OpportunityService;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-
-@RestController
-@RequestMapping("/api/opportunities")
-public class OpportunityController {
-
-    private final OpportunityService service;
-
-    public OpportunityController(OpportunityService service) {
-        this.service = service;
-    }
-
-    @PostMapping
-    public Opportunity create(@RequestBody Opportunity opp) {
-        return service.save(opp);
-    }
-
-    @GetMapping
-    public List<Opportunity> getAll() {
-        return service.findAll();
-    }
-
-    @GetMapping("/{id}")
-    public Opportunity get(@PathVariable Long id) {
-        return service.findById(id);
-    }
-
-    @PutMapping("/{id}")
-    public Opportunity update(@PathVariable Long id, @RequestBody Opportunity opp) {
-        opp.setId(id);
-        return service.save(opp);
-    }
-
-    @DeleteMapping("/{id}")
-    public String delete(@PathVariable Long id) {
-        service.delete(id);
-        return "Deleted Successfully";
-    }
-}
-
-
