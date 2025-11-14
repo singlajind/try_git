@@ -1,27 +1,26 @@
-public interface PropertyRepository extends JpaRepository<Property, Long> {
-    Optional<Property> findByTypeAndValue(String type, String value);
-}
+private final MyService myService;
 
-@Service
-public class PropertyService {
-
-    private final PropertyRepository propertyRepository;
-
-    public PropertyService(PropertyRepository propertyRepository) {
-        this.propertyRepository = propertyRepository;
+    @Autowired
+    public MyController(MyService myService) {
+        this.myService = myService;
     }
 
-    @Transactional
-    public Property getOrCreate(String type, String value) {
-        // Check if property exists
-        return propertyRepository.findByTypeAndValue(type, value)
-                .orElseGet(() -> {
-                    // Create new if not exists
-                    Property p = new Property();
-                    p.setType(type);
-                    p.setValue(value);
-                    // Set default values for other fields if necessary
-                    return propertyRepository.save(p);
-                });
+    @GetMapping("/list")
+    public List<String> getList() {
+        return myService.list();
     }
-}
+
+    @GetMapping("/count")
+    public Integer getCount() {
+        return myService.count();
+    }
+
+    @GetMapping("/details")
+    public String getDetails() {
+        return myService.details();
+    }
+
+    @GetMapping("/all-details")
+    public String getAllDetails() {
+        return myService.allDetails();
+    }
