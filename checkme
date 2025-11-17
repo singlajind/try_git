@@ -1,66 +1,115 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
-         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+public static RestTemplate create() throws Exception {
 
-    <modelVersion>4.0.0</modelVersion>
+        // Load your certificate
+        CertificateFactory cf = CertificateFactory.getInstance("X.509");
 
-    <groupId>com.example</groupId>
-    <artifactId>demo</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <name>demo</name>
-    <description>Demo project</description>
+        InputStream certStream = SecureRestTemplate.class
+                .getResourceAsStream("/certs/myserver.crt");
 
-    <!-- Set Spring Boot version -->
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.5.8</version>
-        <relativePath/> 
-    </parent>
+        X509Certificate caCert = (X509Certificate) cf.generateCertificate(certStream);
 
-    <!-- Java 11 -->
-    <properties>
-        <java.version>11</java.version>
-    </properties>
+        // Create a KeyStore with your trusted certificate
+        KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+        ks.load(null, null);
+        ks.setCertificateEntry("myserver", caCert);
 
-    <dependencies>
+        // Build SSLContext using only your certificate
+        SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
+        sslContextBuilder.loadTrustMaterial(ks, null);
 
-        <!-- Web -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
+        SSLConnectionSocketFactory socketFactory =
+                new SSLConnectionSocketFactory(sslContextBuilder.build());
 
-        <!-- Boot Test (explicit) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-test</artifactId>
-            <scope>test</scope>
-        </dependency>
+        CloseableHttpClient httpClient = HttpClients.custom()
+                .setSSLSocketFactory(socketFactory)
+                .build();
 
-        <!-- Starter Test -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
+        HttpComponentsClientHttpRequestFactory requestFactory =
+                new HttpComponentsClientHttpRequestFactory(httpClient);
 
-    </dependencies>
+        return new RestTemplate(requestFactory);
+    }
+}
+Usage:
 
-    <build>
-        <plugins>
-            <!-- Maven Compiler Plugin for Java 11 -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version>
-                <configuration>
-                    <release>11</release>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
+java
+Copy code
+RestTemplate restTemplate = SecureRestTemplate.create();
+String response = restTemplate.getForObject("https://your-secure-api", String.class);
+✔ This will trust only your certificate
+✔ Safe for production
 
-</project>
+✅ Option 2 — Use a JKS truststore (recommended for enterprise)
+If you already have:
+
+truststore.jks
+
+or want to create one using your certificate
+
+1. Create truststore using keytool
+pgsql
+Copy code
+keytool -import -alias myserver \
+  -file myserver.crt \
+  -keystore truststore.jks
+Set password when prompted.
+
+2. Use truststore with RestTemplate
+java
+Copy code
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContextBuilder;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.RestTemplate;
+
+import java.io.FileInputStream;
+import java.security.KeyStore;
+
+public class TrustStoreRestTemplate {
+
+    public static RestTemplate create() throws Exception {
+
+        String truststorePath = "/path/to/truststore.jks";
+        char[] password = "changeit".toCharArray(); // your password
+
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        trustStore.load(new FileInputStream(truststorePath), password);
+
+        SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
+        sslContextBuilder.loadTrustMaterial(trustStore, null);
+
+        SSLConnectionSocketFactory socketFactory =
+                new SSLConnectionSocketFactory(sslContextBuilder.build());
+
+        CloseableHttpClient httpClient = HttpClients.custom()
+                .setSSLSocketFactory(socketFactory)
+                .build();
+
+        HttpComponentsClientHttpRequestFactory requestFactory =
+                new HttpComponentsClientHttpRequestFactory(httpClient);
+
+        return new RestTemplate(requestFactory);
+    }
+}
+🔥 Which approach should you use?
+Approach	When to Use
+Load certificate directly (Option 1)	Quick setup when you only have .crt/.pem file
+Truststore (Option 2)	Enterprise, multiple certificates, DevOps-friendly
+
+If you want, I can generate:
+✔ A Spring @Configuration with a @Bean RestTemplate
+✔ A version for Spring WebClient
+✔ Steps to convert PEM → JKS
+✔ How to debug SSL handshake failures
+
+Tell me what you need!
+
+
+
+
+
+
+
+
