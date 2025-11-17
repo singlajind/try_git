@@ -1,115 +1,36 @@
-public static RestTemplate create() throws Exception {
+Comparator.nullsFirst(Comparator.naturalOrder())
 
-        // Load your certificate
-        CertificateFactory cf = CertificateFactory.getInstance("X.509");
 
-        InputStream certStream = SecureRestTemplate.class
-                .getResourceAsStream("/certs/myserver.crt");
+public class UnsafeRestTemplateFactory {
 
-        X509Certificate caCert = (X509Certificate) cf.generateCertificate(certStream);
+    public static RestTemplate createRestTemplate() {
+        try {
+            SSLContext sslContext = new SSLContextBuilder()
+                    .loadTrustMaterial(null, (certificate, authType) -> true)   // Trust ALL certificates
+                    .build();
 
-        // Create a KeyStore with your trusted certificate
-        KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
-        ks.load(null, null);
-        ks.setCertificateEntry("myserver", caCert);
+            SSLConnectionSocketFactory csf =
+                    new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
 
-        // Build SSLContext using only your certificate
-        SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
-        sslContextBuilder.loadTrustMaterial(ks, null);
+            HttpClient httpClient = HttpClients.custom()
+                    .setSSLSocketFactory(csf)
+                    .build();
 
-        SSLConnectionSocketFactory socketFactory =
-                new SSLConnectionSocketFactory(sslContextBuilder.build());
+            HttpComponentsClientHttpRequestFactory requestFactory =
+                    new HttpComponentsClientHttpRequestFactory();
 
-        CloseableHttpClient httpClient = HttpClients.custom()
-                .setSSLSocketFactory(socketFactory)
-                .build();
+            requestFactory.setHttpClient(httpClient);
 
-        HttpComponentsClientHttpRequestFactory requestFactory =
-                new HttpComponentsClientHttpRequestFactory(httpClient);
+            return new RestTemplate(requestFactory);
 
-        return new RestTemplate(requestFactory);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }
-Usage:
 
-java
-Copy code
-RestTemplate restTemplate = SecureRestTemplate.create();
-String response = restTemplate.getForObject("https://your-secure-api", String.class);
-✔ This will trust only your certificate
-✔ Safe for production
-
-✅ Option 2 — Use a JKS truststore (recommended for enterprise)
-If you already have:
-
-truststore.jks
-
-or want to create one using your certificate
-
-1. Create truststore using keytool
-pgsql
-Copy code
-keytool -import -alias myserver \
-  -file myserver.crt \
-  -keystore truststore.jks
-Set password when prompted.
-
-2. Use truststore with RestTemplate
-java
-Copy code
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.ssl.SSLContextBuilder;
-import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
-import org.springframework.web.client.RestTemplate;
-
-import java.io.FileInputStream;
-import java.security.KeyStore;
-
-public class TrustStoreRestTemplate {
-
-    public static RestTemplate create() throws Exception {
-
-        String truststorePath = "/path/to/truststore.jks";
-        char[] password = "changeit".toCharArray(); // your password
-
-        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        trustStore.load(new FileInputStream(truststorePath), password);
-
-        SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
-        sslContextBuilder.loadTrustMaterial(trustStore, null);
-
-        SSLConnectionSocketFactory socketFactory =
-                new SSLConnectionSocketFactory(sslContextBuilder.build());
-
-        CloseableHttpClient httpClient = HttpClients.custom()
-                .setSSLSocketFactory(socketFactory)
-                .build();
-
-        HttpComponentsClientHttpRequestFactory requestFactory =
-                new HttpComponentsClientHttpRequestFactory(httpClient);
-
-        return new RestTemplate(requestFactory);
-    }
-}
-🔥 Which approach should you use?
-Approach	When to Use
-Load certificate directly (Option 1)	Quick setup when you only have .crt/.pem file
-Truststore (Option 2)	Enterprise, multiple certificates, DevOps-friendly
-
-If you want, I can generate:
-✔ A Spring @Configuration with a @Bean RestTemplate
-✔ A version for Spring WebClient
-✔ Steps to convert PEM → JKS
-✔ How to debug SSL handshake failures
-
-Tell me what you need!
-
-
-
-
-
-
-
-
+<dependency>
+    <groupId>org.apache.httpcomponents</groupId>
+    <artifactId>httpclient</artifactId>
+    <version>4.5.13</version>
+</dependency>
