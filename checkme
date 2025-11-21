@@ -1,4 +1,39 @@
- public static void main(String[] args) throws Exception {
+@Bean
+    public RestTemplate restTemplate() throws Exception {
+
+        // Load the .crt file from resources
+        InputStream certStream = getClass().getResourceAsStream("/mycert.crt");
+
+        // Create an in-memory truststore
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        trustStore.load(null);
+
+        // Load certificate
+        java.security.cert.CertificateFactory cf =
+                java.security.cert.CertificateFactory.getInstance("X.509");
+        java.security.cert.Certificate cert = cf.generateCertificate(certStream);
+        trustStore.setCertificateEntry("server", cert);
+
+        // Build SSL context
+        SSLContextBuilder sslContextBuilder = new SSLContextBuilder();
+        sslContextBuilder.loadTrustMaterial(trustStore, new TrustSelfSignedStrategy());
+
+        SSLConnectionSocketFactory socketFactory =
+                new SSLConnectionSocketFactory(sslContextBuilder.build());
+
+        CloseableHttpClient httpClient = HttpClients.custom()
+                .setSSLSocketFactory(socketFactory)
+                .build();
+
+        HttpComponentsClientHttpRequestFactory requestFactory =
+                new HttpComponentsClientHttpRequestFactory(httpClient);
+
+        return new RestTemplate(requestFactory);
+    }
+
+
+
+public static void main(String[] args) throws Exception {
 
         Robot robot = new Robot();
 
