@@ -1,3 +1,21 @@
+@RestController
+@RequestMapping("/api/claims")
+public class ClaimDocumentController {
+
+    @Autowired
+    private FileStorageService fileStorageService;
+
+    @PostMapping("/{claimId}/documents")
+    public ResponseEntity<?> uploadDocuments(
+            @PathVariable String claimId,
+            @RequestParam("files") List<MultipartFile> files) {
+
+        List<String> uploadedFiles = fileStorageService.storeFiles(claimId, files);
+        return ResponseEntity.ok(uploadedFiles);
+    }
+}
+
+
 spring.servlet.multipart.max-file-size=-1
 spring.servlet.multipart.max-request-size=-1
 
