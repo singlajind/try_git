@@ -1,167 +1,61 @@
-@RestController
-@RequestMapping("/api/claims")
-public class ClaimDocumentController {
-
-    @Autowired
-    private FileStorageService fileStorageService;
-
-    @PostMapping("/{claimId}/documents")
-    public ResponseEntity<?> uploadDocuments(
-            @PathVariable String claimId,
-            @RequestParam("files") List<MultipartFile> files) {
-
-        List<String> uploadedFiles = fileStorageService.storeFiles(claimId, files);
-        return ResponseEntity.ok(uploadedFiles);
-    }
-}
-
-
-@RestController
-@RequestMapping("/api/claims")
-public class ClaimDocumentController {
-
-    @Autowired
-    private FileStorageService fileStorageService;
-
-    @PostMapping("/{claimId}/documents")
-    public ResponseEntity<?> uploadDocuments(
-            @PathVariable String claimId,
-            @RequestParam("files") List<MultipartFile> files) {
-
-        List<String> uploadedFiles = fileStorageService.storeFiles(claimId, files);
-        return ResponseEntity.ok(uploadedFiles);
-    }
-}
-
-
-spring.servlet.multipart.max-file-size=-1
-spring.servlet.multipart.max-request-size=-1
-
-# Where to store files
-files.storage.location=C:/claim-documents
-
-@Entity
-@Table(name = "claim_documents")
-public class ClaimDocument {
-
-    @Id
-    private String id;   // UUID
-
-    @Column(name = "claim_id")
-    private String claimId;
-
-    @Column(name = "original_name")
-    private String originalName;
-
-    @Column(name = "file_size")
-    private long fileSize;
-
-    @Column(name = "content_type")
-    private String contentType;
-
-    @Column(name = "extension")
-    private String extension;
-
-    @Column(name = "upload_time")
-    private LocalDateTime uploadTime;
-}
-
-public interface ClaimDocumentRepository extends JpaRepository<ClaimDocument, String> {
-
-    List<ClaimDocument> findByClaimId(String claimId);
-}
-
 @Service
-public class FileStorageService {
-
-    @Value("${files.storage.location}")
-    private String basePath;
+public class NotificationScheduler {
 
     @Autowired
-    private ClaimDocumentRepository repo;
+    private ActionRepository repo;
 
-    public List<String> storeFiles(String claimId, List<MultipartFile> files) {
+    @Autowired
+    private AssigneeService assigneeService;
 
-        Path claimFolder = Paths.get(basePath, claimId).toAbsolutePath().normalize();
-        try {
-            Files.createDirectories(claimFolder);
-        } catch (IOException ignored) { }
+    @Autowired
+    private NotificationService notificationService;
 
-        List<String> storedIds = new ArrayList<>();
+    // Run every 5 minutes
+    @Scheduled(fixedRate = 300000)
+    public void processNotifications() {
 
-        for (MultipartFile file : files) {
-            if (file.isEmpty()) continue;
+        List<Action> actions = repo.findByStatus("OPEN");
 
-            String uuid = UUID.randomUUID().toString();
-            Path targetLocation = claimFolder.resolve(uuid);  // Store as UUID only
+        for (Action action : actions) {
 
-            // Stream file to disk
-            try (InputStream is = file.getInputStream();
-                 OutputStream os = Files.newOutputStream(targetLocation)) {
+            AssigneeInfo info = assigneeService.getAssigneeInfo(action.getAssignee());
+            ZoneId zoneId = assigneeService.getZoneId(info.getCountry());
 
-                byte[] buffer = new byte[8192];
-                int len;
-                while ((len = is.read(buffer)) != -1) {
-                    os.write(buffer, 0, len);
-                }
+            LocalDate due = action.getDueDate();
 
-            } catch (Exception e) {
-                throw new RuntimeException("Could not store file", e);
+            LocalDateTime preDueLocal = due.minusDays(1).atTime(9, 0);
+            LocalDateTime postDueLocal = due.plusDays(1).atTime(9, 0);
+
+            ZonedDateTime nowLocal = ZonedDateTime.now(zoneId);
+
+            // Pre-due notification
+            if (!action.isPreDueNotificationSent() &&
+                nowLocal.toLocalDate().isEqual(preDueLocal.toLocalDate()) &&
+                nowLocal.getHour() == 9 &&
+                nowLocal.getMinute() <= 5) {
+
+                notificationService.send(info.getEmail(),
+                        "Action is due tomorrow",
+                        action);
+
+                action.setPreDueNotificationSent(true);
             }
 
-            // Save metadata
-            ClaimDocument meta = new ClaimDocument();
-            meta.setId(uuid);
-            meta.setClaimId(claimId);
-            meta.setOriginalName(file.getOriginalFilename());
-            meta.setFileSize(file.getSize());
-            meta.setContentType(file.getContentType());
-            meta.setExtension(getExtension(file.getOriginalFilename()));
-            meta.setUploadTime(LocalDateTime.now());
+            // Post-due notification
+            if (!action.isPostDueNotificationSent() &&
+                nowLocal.toLocalDate().isEqual(postDueLocal.toLocalDate()) &&
+                nowLocal.getHour() == 9 &&
+                nowLocal.getMinute() <= 5) {
 
-            repo.save(meta);
-            storedIds.add(uuid);
+                notificationService.send(info.getEmail(),
+                        "Action is overdue",
+                        action);
+
+                action.setPostDueNotificationSent(true);
+            }
+
+            repo.save(action);
         }
 
-        return storedIds;
-    }
-
-    private String getExtension(String fileName) {
-        if (fileName == null) return "";
-        int idx = fileName.lastIndexOf('.');
-        return idx > 0 ? fileName.substring(idx + 1) : "";
     }
 }
-
-@GetMapping("/{claimId}/documents")
-public ResponseEntity<List<ClaimDocument>> listDocuments(@PathVariable String claimId) {
-    return ResponseEntity.ok(repo.findByClaimId(claimId));
-}
-
-@GetMapping("/documents/{fileId}")
-public ResponseEntity<Resource> download(@PathVariable String fileId) {
-
-    ClaimDocument meta = repo.findById(fileId)
-            .orElseThrow(() -> new RuntimeException("File not found"));
-
-    Path filePath = Paths.get(basePath, meta.getClaimId(), meta.getId());
-
-    Resource resource;
-    try {
-        resource = new UrlResource(filePath.toUri());
-        if (!resource.exists()) {
-            throw new RuntimeException("File missing on disk");
-        }
-    } catch (Exception e) {
-        throw new RuntimeException("Could not read file");
-    }
-
-    return ResponseEntity.ok()
-            .contentType(MediaType.parseMediaType(meta.getContentType()))
-            .header(HttpHeaders.CONTENT_DISPOSITION,
-                    "attachment; filename=\"" + meta.getOriginalName() + "\"")
-            .body(resource);
-}
-
-
-
