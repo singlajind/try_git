@@ -1,61 +1,91 @@
+public class TimeZoneUtil {
+
+    private static final Map<String, ZoneId> COUNTRY_ZONE_MAP = Map.of(
+            "IN", ZoneId.of("Asia/Kolkata"),
+            "US", ZoneId.of("America/New_York"),
+            "UK", ZoneId.of("Europe/London"),
+            "SG", ZoneId.of("Asia/Singapore")
+            // Add more
+    );
+
+    public static LocalTime getUserLocalTime(String countryCode) {
+        ZoneId userZone = COUNTRY_ZONE_MAP.getOrDefault(countryCode, ZoneId.of("UTC"));
+        return ZonedDateTime.now(userZone).toLocalTime();
+    }
+}
+
+
+public interface NotificationLogRepository 
+        extends JpaRepository<NotificationLog, BigInteger> {
+
+    Optional<NotificationLog> findByTaskIdAndEmail(BigInteger taskId, String email);
+}
+
+@Entity
+public class NotificationLog {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private Long taskId;
+    private String email;
+
+    private Integer reminderSent;   // null=no attempt, 0=failed, 1=sent
+    private Integer alertSent;
+
+    private String reminderFailureReason;
+    private String alertFailureReason;
+}
+
 @Service
-public class NotificationScheduler {
+public class NotificationProcessor {
 
     @Autowired
-    private ActionRepository repo;
+    private NotificationLogRepository logRepo;
 
     @Autowired
-    private AssigneeService assigneeService;
+    private EmailService emailService;
 
-    @Autowired
-    private NotificationService notificationService;
+    public void processNotifications(List<Task> tasks, 
+                                     Map<String, String> userCountryMap) {
 
-    // Run every 5 minutes
-    @Scheduled(fixedRate = 300000)
-    public void processNotifications() {
+        for (Task task : tasks) {
+            String assigneeEmail = task.getAssigneeEmail();
+            if (assigneeEmail == null) continue;
 
-        List<Action> actions = repo.findByStatus("OPEN");
+            String countryCode = userCountryMap.get(assigneeEmail);
+            if (countryCode == null) continue;
 
-        for (Action action : actions) {
+            LocalTime userLocalTime = TimeZoneUtil.getUserLocalTime(countryCode);
 
-            AssigneeInfo info = assigneeService.getAssigneeInfo(action.getAssignee());
-            ZoneId zoneId = assigneeService.getZoneId(info.getCountry());
-
-            LocalDate due = action.getDueDate();
-
-            LocalDateTime preDueLocal = due.minusDays(1).atTime(9, 0);
-            LocalDateTime postDueLocal = due.plusDays(1).atTime(9, 0);
-
-            ZonedDateTime nowLocal = ZonedDateTime.now(zoneId);
-
-            // Pre-due notification
-            if (!action.isPreDueNotificationSent() &&
-                nowLocal.toLocalDate().isEqual(preDueLocal.toLocalDate()) &&
-                nowLocal.getHour() == 9 &&
-                nowLocal.getMinute() <= 5) {
-
-                notificationService.send(info.getEmail(),
-                        "Action is due tomorrow",
-                        action);
-
-                action.setPreDueNotificationSent(true);
+            // Check time >= 08:30 AM
+            if (userLocalTime.isBefore(LocalTime.of(8, 30))) {
+                continue;
             }
 
-            // Post-due notification
-            if (!action.isPostDueNotificationSent() &&
-                nowLocal.toLocalDate().isEqual(postDueLocal.toLocalDate()) &&
-                nowLocal.getHour() == 9 &&
-                nowLocal.getMinute() <= 5) {
+            // Check if NotificationLog already exists
+            Optional<NotificationLog> logOpt =
+                    logRepo.findByTaskIdAndEmail(task.getId(), assigneeEmail);
 
-                notificationService.send(info.getEmail(),
-                        "Action is overdue",
-                        action);
-
-                action.setPostDueNotificationSent(true);
+            if (logOpt.isPresent() && logOpt.get().getReminderSent() != null) {
+                continue; // already attempted
             }
 
-            repo.save(action);
+            NotificationLog log = logOpt.orElse(new NotificationLog());
+            log.setTaskId(task.getId());
+            log.setEmail(assigneeEmail);
+
+            try {
+                emailService.send(task);
+                log.setReminderSent(1);
+                log.setReminderFailureReason(null);
+            } catch (Exception ex) {
+                log.setReminderSent(0);
+                log.setReminderFailureReason(ex.getMessage());
+            }
+
+            logRepo.save(log);
         }
-
     }
 }
