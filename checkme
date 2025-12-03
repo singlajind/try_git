@@ -1,3 +1,24 @@
+@Scheduled(cron = "0 0 1 * * *")
+    public void updateLateTasks() {
+
+        LocalDate today = LocalDate.now();
+
+        // Fetch all open tasks
+        List<Task> openTasks = taskRepository.findByStatus(TaskStatus.OPEN);
+
+        for (Task task : openTasks) {
+
+            if (task.getDueDate() != null 
+                    && today.isAfter(task.getDueDate())) {
+
+                task.setStatus(TaskStatus.LATE);
+            }
+        }
+
+        taskRepository.saveAll(openTasks);
+    }
+
+
 public class TimeZoneUtil {
 
     private static final Map<String, ZoneId> COUNTRY_ZONE_MAP = Map.of(
