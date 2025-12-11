@@ -1,112 +1,473 @@
-@Scheduled(cron = "0 0 1 * * *")
-    public void updateLateTasks() {
+# Spring Boot File Watcher - Java
 
-        LocalDate today = LocalDate.now();
+This single-file project listing contains all source files needed to run a Spring Boot application that: 
 
-        // Fetch all open tasks
-        List<Task> openTasks = taskRepository.findByStatus(TaskStatus.OPEN);
+- Observes a configured folder for new files using Java's WatchService.
+- When a new file appears, hands it off to a processing method executed in its own thread.
+- Exposes a REST endpoint to trigger processing for a specific absolute file path.
+- Is resilient: one file failure won't stop the watcher or other tasks.
 
-        for (Task task : openTasks) {
+Configuration is read from `application.properties` (see below).
 
-            if (task.getDueDate() != null 
-                    && today.isAfter(task.getDueDate())) {
+---
 
-                task.setStatus(TaskStatus.LATE);
+## pom.xml
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>file-watcher</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <java.version>11</java.version>
+        <spring.boot.version>2.7.14</spring.boot.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <version>${spring.boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+            <version>${spring.boot.version}</version>
+        </dependency>
+        <!-- For nicer logging configuration, optional -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-logging</artifactId>
+            <version>${spring.boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring.boot.version}</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+---
+
+## application.properties (place under src/main/resources)
+
+```
+# Absolute path of folder to watch - set this to an existing folder on your machine
+filewatcher.watch-folder=/tmp/watched
+
+# thread pool config
+filewatcher.thread-pool-size=8
+
+# time in ms to wait for file to be stable before processing
+filewatcher.stable-ms=500
+
+server.port=8080
+```
+
+---
+
+## src/main/java/com/example/filewatcher/FileWatcherApplication.java
+
+```java
+package com.example.filewatcher;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class FileWatcherApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(FileWatcherApplication.class, args);
+    }
+}
+```
+
+---
+
+## src/main/java/com/example/filewatcher/config/FileWatcherProperties.java
+
+```java
+package com.example.filewatcher.config;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
+@Component
+@ConfigurationProperties(prefix = "filewatcher")
+public class FileWatcherProperties {
+    private String watchFolder;
+    private int threadPoolSize = 4;
+    private long stableMs = 500;
+
+    public String getWatchFolder() {
+        return watchFolder;
+    }
+
+    public void setWatchFolder(String watchFolder) {
+        this.watchFolder = watchFolder;
+    }
+
+    public int getThreadPoolSize() {
+        return threadPoolSize;
+    }
+
+    public void setThreadPoolSize(int threadPoolSize) {
+        this.threadPoolSize = threadPoolSize;
+    }
+
+    public long getStableMs() {
+        return stableMs;
+    }
+
+    public void setStableMs(long stableMs) {
+        this.stableMs = stableMs;
+    }
+}
+```
+
+---
+
+## src/main/java/com/example/filewatcher/service/FileProcessorService.java
+
+```java
+package com.example.filewatcher.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+/**
+ * Actual business file processing logic goes here. Keep this service small and resilient.
+ * If a file fails to process, throw or log and let the caller decide retry or ignore.
+ */
+@Service
+public class FileProcessorService {
+    private static final Logger log = LoggerFactory.getLogger(FileProcessorService.class);
+
+    public void process(Path file) throws Exception {
+        log.info("Starting processing: {}", file);
+
+        // Example: read file size and first line - replace with real logic
+        try {
+            long size = Files.size(file);
+            log.info("File size: {} bytes", size);
+
+            // placeholder for your processing
+            String firstLine = "";
+            try {
+                firstLine = Files.lines(file).findFirst().orElse("");
+            } catch (IOException e) {
+                log.debug("Could not read lines - maybe binary file: {}", e.getMessage());
             }
+
+            log.info("First line preview: {}", firstLine);
+
+            // Simulate processing time if needed
+            // Thread.sleep(2000);
+
+            // If something goes wrong, throw an exception so the runner can log it and continue
+            // throw new RuntimeException("simulated failure");
+
+            log.info("Completed processing: {}", file);
+        } catch (IOException e) {
+            log.error("I/O error while processing {}, will propagate: {}", file, e.getMessage());
+            throw e;
         }
-
-        taskRepository.saveAll(openTasks);
-    }
-
-
-public class TimeZoneUtil {
-
-    private static final Map<String, ZoneId> COUNTRY_ZONE_MAP = Map.of(
-            "IN", ZoneId.of("Asia/Kolkata"),
-            "US", ZoneId.of("America/New_York"),
-            "UK", ZoneId.of("Europe/London"),
-            "SG", ZoneId.of("Asia/Singapore")
-            // Add more
-    );
-
-    public static LocalTime getUserLocalTime(String countryCode) {
-        ZoneId userZone = COUNTRY_ZONE_MAP.getOrDefault(countryCode, ZoneId.of("UTC"));
-        return ZonedDateTime.now(userZone).toLocalTime();
     }
 }
+```
 
+---
 
-public interface NotificationLogRepository 
-        extends JpaRepository<NotificationLog, BigInteger> {
+## src/main/java/com/example/filewatcher/service/FileWatcherService.java
 
-    Optional<NotificationLog> findByTaskIdAndEmail(BigInteger taskId, String email);
-}
+```java
+package com.example.filewatcher.service;
 
-@Entity
-public class NotificationLog {
+import com.example.filewatcher.config.FileWatcherProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.stereotype.Service;
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    private Long taskId;
-    private String email;
-
-    private Integer reminderSent;   // null=no attempt, 0=failed, 1=sent
-    private Integer alertSent;
-
-    private String reminderFailureReason;
-    private String alertFailureReason;
-}
+import java.io.IOException;
+import java.nio.file.*;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 
 @Service
-public class NotificationProcessor {
+public class FileWatcherService implements ApplicationRunner, DisposableBean {
+    private static final Logger log = LoggerFactory.getLogger(FileWatcherService.class);
+
+    private final FileWatcherProperties props;
+    private final FileProcessorService processor;
+
+    private WatchService watchService;
+    private Thread watcherThread;
+    private ExecutorService executor;
 
     @Autowired
-    private NotificationLogRepository logRepo;
+    public FileWatcherService(FileWatcherProperties props, FileProcessorService processor) {
+        this.props = props;
+        this.processor = processor;
+    }
 
-    @Autowired
-    private EmailService emailService;
+    @Override
+    public void run(ApplicationArguments args) throws Exception {
+        Objects.requireNonNull(props.getWatchFolder(), "watch-folder must be configured");
+        Path folder = Paths.get(props.getWatchFolder());
+        if (!Files.exists(folder) || !Files.isDirectory(folder)) {
+            throw new IllegalArgumentException("watch-folder must exist and be a directory: " + folder);
+        }
 
-    public void processNotifications(List<Task> tasks, 
-                                     Map<String, String> userCountryMap) {
+        log.info("Starting watcher for folder: {}", folder);
 
-        for (Task task : tasks) {
-            String assigneeEmail = task.getAssigneeEmail();
-            if (assigneeEmail == null) continue;
+        watchService = FileSystems.getDefault().newWatchService();
+        folder.register(watchService, StandardWatchEventKinds.ENTRY_CREATE);
 
-            String countryCode = userCountryMap.get(assigneeEmail);
-            if (countryCode == null) continue;
+        executor = Executors.newFixedThreadPool(Math.max(1, props.getThreadPoolSize()));
 
-            LocalTime userLocalTime = TimeZoneUtil.getUserLocalTime(countryCode);
+        watcherThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                WatchKey key;
+                try {
+                    key = watchService.take();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (ClosedWatchServiceException cwse) {
+                    log.info("Watch service closed, exiting watcher thread");
+                    break;
+                }
 
-            // Check time >= 08:30 AM
-            if (userLocalTime.isBefore(LocalTime.of(8, 30))) {
+                for (WatchEvent<?> event : key.pollEvents()) {
+                    WatchEvent.Kind<?> kind = event.kind();
+                    if (kind == StandardWatchEventKinds.OVERFLOW) {
+                        log.warn("WatchService overflow event occurred");
+                        continue;
+                    }
+
+                    WatchEvent<Path> ev = (WatchEvent<Path>) event;
+                    Path filename = ev.context();
+                    Path child = folder.resolve(filename);
+
+                    // submit processing in its own runnable so one failure won't affect others
+                    try {
+                        executor.submit(() -> handleFileArrival(child));
+                    } catch (RejectedExecutionException rex) {
+                        log.error("Task rejected for file {}: {}", child, rex.getMessage());
+                    }
+                }
+
+                boolean valid = key.reset();
+                if (!valid) {
+                    log.warn("Watch key no longer valid, stopping watcher");
+                    break;
+                }
+            }
+
+            log.info("Watcher thread exiting");
+        }, "file-watcher-thread");
+
+        watcherThread.setDaemon(true);
+        watcherThread.start();
+    }
+
+    private void handleFileArrival(Path file) {
+        try {
+            // wait for the file to be stable (size not changing) to avoid partial reads
+            waitForStableFile(file, props.getStableMs(), 10_000);
+
+            try {
+                processor.process(file);
+            } catch (Exception e) {
+                log.error("Error processing file {}: {}", file, e.getMessage(), e);
+                // swallow exception so it doesn't kill thread pool; optionally implement retry here
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted while waiting for stable file: {}", file);
+        } catch (IOException ioe) {
+            log.error("IO error while waiting for file {} to be ready: {}", file, ioe.getMessage(), ioe);
+        }
+    }
+
+    /**
+     * Wait until file size is stable for stableMs milliseconds or throw IOException on timeout.
+     */
+    private void waitForStableFile(Path file, long stableMs, long timeoutMs) throws InterruptedException, IOException {
+        long start = System.currentTimeMillis();
+        long lastSize = -1;
+        long lastChangeAt = System.currentTimeMillis();
+
+        while (true) {
+            if (!Files.exists(file)) {
+                // file may not be visible yet - give some time
+                if (System.currentTimeMillis() - start > timeoutMs) {
+                    throw new IOException("File did not appear within timeout: " + file);
+                }
+                Thread.sleep(100);
                 continue;
             }
 
-            // Check if NotificationLog already exists
-            Optional<NotificationLog> logOpt =
-                    logRepo.findByTaskIdAndEmail(task.getId(), assigneeEmail);
-
-            if (logOpt.isPresent() && logOpt.get().getReminderSent() != null) {
-                continue; // already attempted
-            }
-
-            NotificationLog log = logOpt.orElse(new NotificationLog());
-            log.setTaskId(task.getId());
-            log.setEmail(assigneeEmail);
-
+            long size;
             try {
-                emailService.send(task);
-                log.setReminderSent(1);
-                log.setReminderFailureReason(null);
-            } catch (Exception ex) {
-                log.setReminderSent(0);
-                log.setReminderFailureReason(ex.getMessage());
+                size = Files.size(file);
+            } catch (IOException e) {
+                // maybe the file is still being written - wait a bit
+                if (System.currentTimeMillis() - start > timeoutMs) {
+                    throw e;
+                }
+                Thread.sleep(100);
+                continue;
             }
 
-            logRepo.save(log);
+            if (size != lastSize) {
+                lastSize = size;
+                lastChangeAt = System.currentTimeMillis();
+            } else {
+                // size unchanged
+                if (System.currentTimeMillis() - lastChangeAt >= stableMs) {
+                    return; // stable
+                }
+            }
+
+            if (System.currentTimeMillis() - start > timeoutMs) {
+                throw new IOException("Timeout waiting for stable file: " + file);
+            }
+
+            Thread.sleep(Math.min(500, stableMs));
+        }
+    }
+
+    /**
+     * Allows external callers (controller) to trigger processing for an arbitrary path.
+     */
+    public void triggerProcessingForPath(Path path) {
+        if (executor == null) {
+            throw new IllegalStateException("Executor not initialized yet");
+        }
+        executor.submit(() -> handleFileArrival(path));
+    }
+
+    @Override
+    public void destroy() throws Exception {
+        log.info("Shutting down FileWatcherService");
+        if (watchService != null) {
+            watchService.close();
+        }
+        if (watcherThread != null) {
+            watcherThread.interrupt();
+            watcherThread.join(2000);
+        }
+        if (executor != null) {
+            executor.shutdown();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
+            executor.shutdownNow();
         }
     }
 }
+```
+
+---
+
+## src/main/java/com/example/filewatcher/controller/FileProcessingController.java
+
+```java
+package com.example.filewatcher.controller;
+
+import com.example.filewatcher.service.FileWatcherService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/files")
+public class FileProcessingController {
+    private static final Logger log = LoggerFactory.getLogger(FileProcessingController.class);
+
+    private final FileWatcherService watcherService;
+
+    @Autowired
+    public FileProcessingController(FileWatcherService watcherService) {
+        this.watcherService = watcherService;
+    }
+
+    /**
+     * Trigger processing for a specific file path. Example body:
+     * {"path":"/abs/path/to/file.txt"}
+     */
+    @PostMapping("/process")
+    public ResponseEntity<?> processFile(@RequestBody Map<String, String> body) {
+        String p = body.get("path");
+        if (p == null || p.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "path is required"));
+        }
+
+        Path path = Paths.get(p);
+        log.info("Manual trigger for path: {}", path);
+        watcherService.triggerProcessingForPath(path);
+        return ResponseEntity.accepted().body(Map.of("status", "scheduled", "path", p));
+    }
+}
+```
+
+---
+
+## Notes & recommendations
+
+1. **Resilience:** All file processing is executed inside the executor with try/catch around the `processor.process(...)`. Any exception is logged and swallowed so the worker threads keep running.
+2. **Multiple files dropped together:** The WatchService will emit events for each file; each file is submitted to the executor so they run concurrently, limited by the thread pool size.
+3. **File stability:** `waitForStableFile` avoids trying to process a file while it's actively being written. You can tune `stable-ms` and timeout in properties.
+4. **Extending:** Replace the placeholder logic in `FileProcessorService.process(Path)` with your actual business logic (move file, parse, call downstream systems, etc.). Consider moving processed files to an archive directory and failed files to a dead-letter folder.
+5. **Retries:** If you want retries for transient failures, wrap processing in a retry loop or use libraries like Spring Retry.
+6. **Testing locally:** set `filewatcher.watch-folder` to a folder on your machine and drop files into it. Use `curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/watched/foo.txt"}' http://localhost:8080/api/files/process` to trigger manually.
+
+---
+
+Happy to adapt this to your preferences (e.g., use Spring Integration, Reactor, or add retries and dead-letter handling).
