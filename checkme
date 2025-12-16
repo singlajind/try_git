@@ -1,3 +1,13 @@
+for (String pattern : patterns) {
+            try {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
+                return LocalDate.parse(dateStr, formatter);
+            } catch (DateTimeParseException ignored) {
+                // try next pattern
+            }
+        }
+
+
 public static String readFirstLineOfInfoFile(Path txtFilePath) throws IOException {
         if (txtFilePath == null) {
             throw new IllegalArgumentException("Input path cannot be null");
