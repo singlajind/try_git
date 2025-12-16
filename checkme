@@ -1,3 +1,26 @@
+public static String readFirstLineOfInfoFile(Path txtFilePath) throws IOException {
+        if (txtFilePath == null) {
+            throw new IllegalArgumentException("Input path cannot be null");
+        }
+
+        String fileName = txtFilePath.getFileName().toString();
+
+        if (!fileName.endsWith(".txt")) {
+            throw new IllegalArgumentException("Input file must have .txt extension");
+        }
+
+        String infoFileName = fileName.substring(0, fileName.length() - 4) + ".info";
+        Path infoFilePath = txtFilePath.resolveSibling(infoFileName);
+
+        try (Stream<String> lines = Files.lines(infoFilePath)) {
+            return lines.findFirst().orElse(null);
+        }
+    }
+
+
+
+
+
 # Spring Boot File Watcher - Java
 
 This single-file project listing contains all source files needed to run a Spring Boot application that: 
