@@ -1,3 +1,23 @@
+private static final DateTimeFormatter FORMATTER =
+            DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+
+    public static LocalDateTime extractDateTime(Path filePath) {
+        String fileName = filePath.getFileName().toString();
+
+        // filenamesuffix_20250118123045_in.txt
+        int start = fileName.indexOf('_') + 1;
+        int end = fileName.indexOf("_in");
+
+        if (start <= 0 || end <= start) {
+            throw new IllegalArgumentException("Invalid filename format: " + fileName);
+        }
+
+        String dateTimePart = fileName.substring(start, end);
+
+        return LocalDateTime.parse(dateTimePart, FORMATTER);
+    }
+
+
 spring.mail.host=smtp.example.com
 spring.mail.port=587
 spring.mail.username=no-reply@example.com
