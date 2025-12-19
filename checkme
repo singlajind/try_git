@@ -1,3 +1,27 @@
+public static void moveToProcessed(Path filePath) throws Exception {
+
+        // Parent directory of the file
+        Path parentDir = filePath.getParent();
+
+        if (parentDir == null) {
+            throw new IllegalArgumentException("File has no parent directory: " + filePath);
+        }
+
+        // processed folder inside the same directory
+        Path processedDir = parentDir.resolve("processed");
+
+        // create processed folder if it does not exist
+        Files.createDirectories(processedDir);
+
+        // target file path
+        Path targetPath = processedDir.resolve(filePath.getFileName());
+
+        // move file
+        Files.move(filePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+
+
 private static final DateTimeFormatter FORMATTER =
             DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
