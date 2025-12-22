@@ -1,3 +1,35 @@
+import java.awt.MouseInfo;
+import java.awt.Point;
+import java.awt.Robot;
+
+public class MouseMover {
+
+    public static void main(String[] args) {
+        try {
+            Robot robot = new Robot();
+
+            System.out.println("Mouse mover started. Press Ctrl+C to stop.");
+
+            while (true) {
+                Thread.sleep(60_000); // 60 seconds
+
+                Point currentPos = MouseInfo.getPointerInfo().getLocation();
+
+                // Move 10 pixels to the left
+                robot.mouseMove(currentPos.x - 10, currentPos.y);
+                Thread.sleep(200);
+
+                // Move 10 pixels to the right (back to original)
+                robot.mouseMove(currentPos.x, currentPos.y);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
 public static void moveToProcessed(Path filePath) throws Exception {
 
         // Parent directory of the file
