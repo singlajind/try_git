@@ -1,19 +1,45 @@
-@Table(name = "vw_group_cost_aggregates")
-@Immutable   // Hibernate annotation (important for views)
-public class GroupCostAggregate {
+CREATE FUNCTION dbo.fn_group_cost_aggregates
+(
+    @subgroup        VARCHAR(100),
+    @subsubgroups    VARCHAR(MAX)   -- comma-separated list
+)
+RETURNS TABLE
+AS
+RETURN
+(
+    WITH DateBounds AS
+    (
+        SELECT
+            CAST(GETDATE() AS DATE) AS today,
 
-    @Id
-    @Column(name = "group_name")
-    private String groupName;
+            -- Monday as start of week (DATEFIRST safe)
+            DATEADD(
+                DAY,
+                -((DATEPART(WEEKDAY, GETDATE()) + @@DATEFIRST - 2) % 7),
+                CAST(GETDATE() AS DATE)
+            ) AS week_start,
 
-    @Column(name = "wtd_cost")
-    private BigDecimal wtdCost;
+            DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS month_start,
 
-    @Column(name = "mtd_cost")
-    private BigDecimal mtdCost;
+            DATEADD(QUARTER, DATEDIFF(QUARTER, 0, GETDATE()), 0) AS quarter_start,
 
-    @Column(name = "qtd_cost")
-    private BigDecimal qtdCost;
+            DATEFROMPARTS(YEAR(GETDATE()), 1, 1) AS year_start
+    )
+    SELECT
+        t.group_name,
 
-    @Column(name = "ytd_cost")
-    private BigDecimal ytdCost;
+        SUM(CASE WHEN t.txn_date >= d.week_start   THEN t.cost ELSE 0 END) AS wtd_cost,
+        SUM(CASE WHEN t.txn_date >= d.month_start  THEN t.cost ELSE 0 END) AS mtd_cost,
+        SUM(CASE WHEN t.txn_date >= d.quarter_start THEN t.cost ELSE 0 END) AS qtd_cost,
+        SUM(CASE WHEN t.txn_date >= d.year_start   THEN t.cost ELSE 0 END) AS ytd_cost
+
+    FROM dbo.YourTable t
+    CROSS JOIN DateBounds d
+    INNER JOIN STRING_SPLIT(@subsubgroups, ',') s
+        ON t.subsubgroup = LTRIM(RTRIM(s.value))
+
+    WHERE t.subgroup = @subgroup
+
+    GROUP BY t.group_name
+);
+GO
