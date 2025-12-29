@@ -1,39 +1,19 @@
-CREATE VIEW dbo.vw_group_cost_aggregates
-AS
-WITH DateBounds AS
-(
-    SELECT
-        CAST(GETDATE() AS DATE) AS today,
+@Table(name = "vw_group_cost_aggregates")
+@Immutable   // Hibernate annotation (important for views)
+public class GroupCostAggregate {
 
-        /* Monday as start of week */
-        DATEADD(
-            DAY,
-            1 - DATEPART(WEEKDAY, CAST(GETDATE() AS DATE)),
-            CAST(GETDATE() AS DATE)
-        ) AS week_start,
+    @Id
+    @Column(name = "group_name")
+    private String groupName;
 
-        DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS month_start,
+    @Column(name = "wtd_cost")
+    private BigDecimal wtdCost;
 
-        DATEADD(QUARTER, DATEDIFF(QUARTER, 0, GETDATE()), 0) AS quarter_start,
+    @Column(name = "mtd_cost")
+    private BigDecimal mtdCost;
 
-        DATEFROMPARTS(YEAR(GETDATE()), 1, 1) AS year_start
-)
-SELECT
-    t.group_name,
+    @Column(name = "qtd_cost")
+    private BigDecimal qtdCost;
 
-    /* Week-to-date */
-    SUM(CASE WHEN t.txn_date >= d.week_start   THEN t.cost ELSE 0 END) AS wtd_cost,
-
-    /* Month-to-date */
-    SUM(CASE WHEN t.txn_date >= d.month_start  THEN t.cost ELSE 0 END) AS mtd_cost,
-
-    /* Quarter-to-date */
-    SUM(CASE WHEN t.txn_date >= d.quarter_start THEN t.cost ELSE 0 END) AS qtd_cost,
-
-    /* Year-to-date */
-    SUM(CASE WHEN t.txn_date >= d.year_start   THEN t.cost ELSE 0 END) AS ytd_cost
-
-FROM dbo.YourTable t
-CROSS JOIN DateBounds d
-GROUP BY t.group_name;
-GO
+    @Column(name = "ytd_cost")
+    private BigDecimal ytdCost;
