@@ -1,45 +1,56 @@
-CREATE FUNCTION dbo.fn_group_cost_aggregates
+CREATE FUNCTION dbo.fn_group_monthly_mtd_cost
 (
     @subgroup        VARCHAR(100),
-    @subsubgroups    VARCHAR(MAX)   -- comma-separated list
+    @subsubgroups    VARCHAR(MAX)   -- comma-separated, optional
 )
 RETURNS TABLE
 AS
 RETURN
 (
-    WITH DateBounds AS
+    WITH SubSubGroups AS
     (
-        SELECT
-            CAST(GETDATE() AS DATE) AS today,
-
-            -- Monday as start of week (DATEFIRST safe)
-            DATEADD(
-                DAY,
-                -((DATEPART(WEEKDAY, GETDATE()) + @@DATEFIRST - 2) % 7),
-                CAST(GETDATE() AS DATE)
-            ) AS week_start,
-
-            DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS month_start,
-
-            DATEADD(QUARTER, DATEDIFF(QUARTER, 0, GETDATE()), 0) AS quarter_start,
-
-            DATEFROMPARTS(YEAR(GETDATE()), 1, 1) AS year_start
+        -- Split CSV only when provided
+        SELECT LTRIM(RTRIM(x.value('.', 'VARCHAR(100)'))) AS subsubgroup
+        FROM (
+            SELECT CAST(
+                '<i>' + REPLACE(@subsubgroups, ',', '</i><i>') + '</i>'
+                AS XML
+            ) AS xml_data
+        ) a
+        CROSS APPLY xml_data.nodes('/i') AS t(x)
+        WHERE @subsubgroups IS NOT NULL
+          AND LTRIM(RTRIM(@subsubgroups)) <> ''
     )
     SELECT
         t.group_name,
 
-        SUM(CASE WHEN t.txn_date >= d.week_start   THEN t.cost ELSE 0 END) AS wtd_cost,
-        SUM(CASE WHEN t.txn_date >= d.month_start  THEN t.cost ELSE 0 END) AS mtd_cost,
-        SUM(CASE WHEN t.txn_date >= d.quarter_start THEN t.cost ELSE 0 END) AS qtd_cost,
-        SUM(CASE WHEN t.txn_date >= d.year_start   THEN t.cost ELSE 0 END) AS ytd_cost
+        -- Month bucket (use first day of month for grouping)
+        DATEFROMPARTS(YEAR(t.txn_date), MONTH(t.txn_date), 1) AS month_start,
+
+        -- Display format like Jan-2025
+        DATENAME(MONTH, t.txn_date) + '-' + CAST(YEAR(t.txn_date) AS VARCHAR(4)) AS month_label,
+
+        SUM(t.cost) AS mtd_cost
 
     FROM dbo.YourTable t
-    CROSS JOIN DateBounds d
-    INNER JOIN STRING_SPLIT(@subsubgroups, ',') s
-        ON t.subsubgroup = LTRIM(RTRIM(s.value))
-
     WHERE t.subgroup = @subgroup
-
-    GROUP BY t.group_name
+      AND t.txn_date >= '2025-01-01'
+      AND t.txn_date <  DATEADD(MONTH, 1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
+      AND
+      (
+          -- No filtering if subsubgroup list not provided
+          @subsubgroups IS NULL
+          OR LTRIM(RTRIM(@subsubgroups)) = ''
+          OR EXISTS (
+              SELECT 1
+              FROM SubSubGroups s
+              WHERE s.subsubgroup = t.subsubgroup
+          )
+      )
+    GROUP BY
+        t.group_name,
+        YEAR(t.txn_date),
+        MONTH(t.txn_date),
+        DATENAME(MONTH, t.txn_date)
 );
 GO
