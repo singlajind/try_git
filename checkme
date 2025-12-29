@@ -1,166 +1,39 @@
-import java.awt.MouseInfo;
-import java.awt.Point;
-import java.awt.Robot;
+CREATE VIEW dbo.vw_group_cost_aggregates
+AS
+WITH DateBounds AS
+(
+    SELECT
+        CAST(GETDATE() AS DATE) AS today,
 
-public class MouseMover {
+        /* Monday as start of week */
+        DATEADD(
+            DAY,
+            1 - DATEPART(WEEKDAY, CAST(GETDATE() AS DATE)),
+            CAST(GETDATE() AS DATE)
+        ) AS week_start,
 
-    public static void main(String[] args) {
-        try {
-            Robot robot = new Robot();
+        DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS month_start,
 
-            System.out.println("Mouse mover started. Press Ctrl+C to stop.");
+        DATEADD(QUARTER, DATEDIFF(QUARTER, 0, GETDATE()), 0) AS quarter_start,
 
-            while (true) {
-                Thread.sleep(60_000); // 60 seconds
+        DATEFROMPARTS(YEAR(GETDATE()), 1, 1) AS year_start
+)
+SELECT
+    t.group_name,
 
-                Point currentPos = MouseInfo.getPointerInfo().getLocation();
+    /* Week-to-date */
+    SUM(CASE WHEN t.txn_date >= d.week_start   THEN t.cost ELSE 0 END) AS wtd_cost,
 
-                // Move 10 pixels to the left
-                robot.mouseMove(currentPos.x - 10, currentPos.y);
-                Thread.sleep(200);
+    /* Month-to-date */
+    SUM(CASE WHEN t.txn_date >= d.month_start  THEN t.cost ELSE 0 END) AS mtd_cost,
 
-                // Move 10 pixels to the right (back to original)
-                robot.mouseMove(currentPos.x, currentPos.y);
-            }
+    /* Quarter-to-date */
+    SUM(CASE WHEN t.txn_date >= d.quarter_start THEN t.cost ELSE 0 END) AS qtd_cost,
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-}
+    /* Year-to-date */
+    SUM(CASE WHEN t.txn_date >= d.year_start   THEN t.cost ELSE 0 END) AS ytd_cost
 
-
-public static void moveToProcessed(Path filePath) throws Exception {
-
-        // Parent directory of the file
-        Path parentDir = filePath.getParent();
-
-        if (parentDir == null) {
-            throw new IllegalArgumentException("File has no parent directory: " + filePath);
-        }
-
-        // processed folder inside the same directory
-        Path processedDir = parentDir.resolve("processed");
-
-        // create processed folder if it does not exist
-        Files.createDirectories(processedDir);
-
-        // target file path
-        Path targetPath = processedDir.resolve(filePath.getFileName());
-
-        // move file
-        Files.move(filePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-    }
-
-
-
-private static final DateTimeFormatter FORMATTER =
-            DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
-
-    public static LocalDateTime extractDateTime(Path filePath) {
-        String fileName = filePath.getFileName().toString();
-
-        // filenamesuffix_20250118123045_in.txt
-        int start = fileName.indexOf('_') + 1;
-        int end = fileName.indexOf("_in");
-
-        if (start <= 0 || end <= start) {
-            throw new IllegalArgumentException("Invalid filename format: " + fileName);
-        }
-
-        String dateTimePart = fileName.substring(start, end);
-
-        return LocalDateTime.parse(dateTimePart, FORMATTER);
-    }
-
-
-spring.mail.host=smtp.example.com
-spring.mail.port=587
-spring.mail.username=no-reply@example.com
-spring.mail.password=secret
-spring.mail.properties.mail.smtp.auth=true
-spring.mail.properties.mail.smtp.starttls.enable=true
-
-mail.from=no-reply@example.com
-mail.to=to@example.com
-mail.cc=cc@example.com
-
-
-@Service
-public class EmailService {
-
-    private final JavaMailSender mailSender;
-
-    @Value("${mail.from}")
-    private String from;
-
-    @Value("${mail.to}")
-    private String to;
-
-    @Value("${mail.cc}")
-    private String cc;
-
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
-
-    public void sendEmail(String body) {
-
-        String finalBody = buildEmailBody(body);
-
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(from);
-        message.setTo(to.split(","));   // supports multiple recipients
-        message.setCc(cc.split(","));
-        message.setSubject("Notification");
-        message.setText(finalBody);
-
-        mailSender.send(message);
-    }
-
-    private String buildEmailBody(String body) {
-        return new StringBuilder()
-                .append("Hi,\n\n")
-                .append(body)
-                .append("\n\nRegards,\n")
-                .toString();
-    }
-}
-3️⃣ How to call the method
-java
-Copy code
-emailService.sendEmail("This is the email body content.");
-4️⃣ Notes (important for backend systems)
-✅ Why this approach is correct
-Uses Spring-managed JavaMailSender
-
-Properties externalized (no hardcoding)
-
-Supports multiple TO / CC emails
-
-Thread-safe and reusable
-
-Easy to unit test (mock JavaMailSender)
-
-5️⃣ Optional enhancements (if you want)
-HTML email (MimeMessageHelper)
-
-Attachments
-
-Dynamic subject
-
-Retry on failure
-
-Async sending (@Async)
-
-Multiple environments (dev/prod SMTP)
-
-If you want HTML version or attachment support, tell me — I’ll extend this cleanly.
-
-
-
-
-
-
-
-
+FROM dbo.YourTable t
+CROSS JOIN DateBounds d
+GROUP BY t.group_name;
+GO
