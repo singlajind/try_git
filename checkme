@@ -1,4 +1,4 @@
-CREATE FUNCTION dbo.fn_group_monthly_mtd_cost
+CREATE FUNCTION dbo.fn_group_monthly_cost_last_2_years
 (
     @subgroup        VARCHAR(100),
     @subsubgroups    VARCHAR(MAX)   -- comma-separated, optional
@@ -7,38 +7,45 @@ RETURNS TABLE
 AS
 RETURN
 (
-    WITH SubSubGroups AS
+    WITH DateBounds AS
     (
-        -- Split CSV only when provided
-        SELECT LTRIM(RTRIM(x.value('.', 'VARCHAR(100)'))) AS subsubgroup
-        FROM (
-            SELECT CAST(
-                '<i>' + REPLACE(@subsubgroups, ',', '</i><i>') + '</i>'
-                AS XML
-            ) AS xml_data
-        ) a
-        CROSS APPLY xml_data.nodes('/i') AS t(x)
+        SELECT
+            -- First day of current month
+            DATEADD(MONTH, DATEDIFF(MONTH, 0, GETDATE()), 0) AS curr_month_start,
+
+            -- First day of month, 23 months ago (rolling 24 months incl current)
+            DATEADD(
+                MONTH,
+                DATEDIFF(MONTH, 0, GETDATE()) - 23,
+                0
+            ) AS start_month
+    ),
+    SubSubGroups AS
+    (
+        SELECT LTRIM(RTRIM(value)) AS subsubgroup
+        FROM STRING_SPLIT(@subsubgroups, ',')
         WHERE @subsubgroups IS NOT NULL
           AND LTRIM(RTRIM(@subsubgroups)) <> ''
     )
     SELECT
         t.group_name,
 
-        -- Month bucket (use first day of month for grouping)
-        DATEFROMPARTS(YEAR(t.txn_date), MONTH(t.txn_date), 1) AS month_start,
+        -- Month bucket
+        DATEADD(MONTH, DATEDIFF(MONTH, 0, t.txn_date), 0) AS month_start,
 
-        -- Display format like Jan-2025
-        DATENAME(MONTH, t.txn_date) + '-' + CAST(YEAR(t.txn_date) AS VARCHAR(4)) AS month_label,
+        -- Friendly label: Jan-2024
+        FORMAT(t.txn_date, 'MMM-yyyy') AS month_label,
 
-        SUM(t.cost) AS mtd_cost
+        SUM(t.cost) AS monthly_cost
 
     FROM dbo.YourTable t
+    CROSS JOIN DateBounds d
     WHERE t.subgroup = @subgroup
-      AND t.txn_date >= '2025-01-01'
-      AND t.txn_date <  DATEADD(MONTH, 1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
+      AND t.txn_date >= d.start_month
+      AND t.txn_date <  DATEADD(MONTH, 1, d.curr_month_start)
       AND
       (
-          -- No filtering if subsubgroup list not provided
+          -- Optional subsubgroup filter
           @subsubgroups IS NULL
           OR LTRIM(RTRIM(@subsubgroups)) = ''
           OR EXISTS (
@@ -49,8 +56,7 @@ RETURN
       )
     GROUP BY
         t.group_name,
-        YEAR(t.txn_date),
-        MONTH(t.txn_date),
-        DATENAME(MONTH, t.txn_date)
+        DATEADD(MONTH, DATEDIFF(MONTH, 0, t.txn_date), 0),
+        FORMAT(t.txn_date, 'MMM-yyyy')
 );
 GO
