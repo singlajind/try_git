@@ -1,62 +1,12 @@
-CREATE FUNCTION dbo.fn_group_monthly_cost_last_2_years
-(
-    @subgroup        VARCHAR(100),
-    @subsubgroups    VARCHAR(MAX)   -- comma-separated, optional
+CREATE EVENT SESSION TrackViewSelects
+ON SERVER
+ADD EVENT sqlserver.sql_statement_completed(
+    ACTION(sqlserver.client_app_name, sqlserver.username)
+    WHERE (sqlserver.sql_text LIKE '%your_view_name%')
 )
-RETURNS TABLE
-AS
-RETURN
-(
-    WITH DateBounds AS
-    (
-        SELECT
-            -- First day of current month
-            DATEADD(MONTH, DATEDIFF(MONTH, 0, GETDATE()), 0) AS curr_month_start,
-
-            -- First day of month, 23 months ago (rolling 24 months incl current)
-            DATEADD(
-                MONTH,
-                DATEDIFF(MONTH, 0, GETDATE()) - 23,
-                0
-            ) AS start_month
-    ),
-    SubSubGroups AS
-    (
-        SELECT LTRIM(RTRIM(value)) AS subsubgroup
-        FROM STRING_SPLIT(@subsubgroups, ',')
-        WHERE @subsubgroups IS NOT NULL
-          AND LTRIM(RTRIM(@subsubgroups)) <> ''
-    )
-    SELECT
-        t.group_name,
-
-        -- Month bucket
-        DATEADD(MONTH, DATEDIFF(MONTH, 0, t.txn_date), 0) AS month_start,
-
-        -- Friendly label: Jan-2024
-        FORMAT(t.txn_date, 'MMM-yyyy') AS month_label,
-
-        SUM(t.cost) AS monthly_cost
-
-    FROM dbo.YourTable t
-    CROSS JOIN DateBounds d
-    WHERE t.subgroup = @subgroup
-      AND t.txn_date >= d.start_month
-      AND t.txn_date <  DATEADD(MONTH, 1, d.curr_month_start)
-      AND
-      (
-          -- Optional subsubgroup filter
-          @subsubgroups IS NULL
-          OR LTRIM(RTRIM(@subsubgroups)) = ''
-          OR EXISTS (
-              SELECT 1
-              FROM SubSubGroups s
-              WHERE s.subsubgroup = t.subsubgroup
-          )
-      )
-    GROUP BY
-        t.group_name,
-        DATEADD(MONTH, DATEDIFF(MONTH, 0, t.txn_date), 0),
-        FORMAT(t.txn_date, 'MMM-yyyy')
-);
+ADD TARGET package0.event_file (SET filename='C:\temp\ViewSelects.xel');
 GO
+ALTER EVENT SESSION TrackViewSelects ON SERVER STATE = START;
+
+
+AUDIT_SELECT ON dbo.your_view BY USER user_x;
