@@ -1,3 +1,13 @@
+SELECT TOP 10
+    DB_NAME(qt.dbid) AS database_name,
+    qs.last_execution_time,
+    qt.text AS full_query_text
+FROM sys.dm_exec_query_stats qs
+CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) qt
+WHERE qt.text LIKE '%select%'
+ORDER BY qs.last_execution_time DESC;
+
+
 CREATE EVENT SESSION TrackViewSelects
 ON SERVER
 ADD EVENT sqlserver.sql_statement_completed(
