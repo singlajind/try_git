@@ -1,5 +1,11 @@
-try (Stream<Path> stream = Files.walk(Paths.get(folderPath), 1)) {
-    stream.filter(Files::isRegularFile)
-          .filter(path -> matchesPredicate(path))
-          .forEach(this::process);
-}
+Files.lines(path)
+            .map(String::trim)
+            .filter(line -> !line.isEmpty())
+            .filter(line -> line.startsWith(startsWith))
+            .map(line -> line.split("\\s+"))
+            .filter(tokens -> tokens.length >= 2) // need at least key present
+            .collect(Collectors.toMap(
+                    tokens -> tokens[1],   // key = second word
+                    tokens -> tokens,      // value = string array
+                    (a, b) -> a            // if duplicate key, keep first (or customize)
+            ));
