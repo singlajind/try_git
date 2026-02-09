@@ -1,11 +1,25 @@
-Files.lines(path)
-            .map(String::trim)
-            .filter(line -> !line.isEmpty())
-            .filter(line -> line.startsWith(startsWith))
-            .map(line -> line.split("\\s+"))
-            .filter(tokens -> tokens.length >= 2) // need at least key present
-            .collect(Collectors.toMap(
-                    tokens -> tokens[1],   // key = second word
-                    tokens -> tokens,      // value = string array
-                    (a, b) -> a            // if duplicate key, keep first (or customize)
-            ));
+
+        try {
+            // delete old image if exists
+            if (oldPath != null) {
+                Files.deleteIfExists(Path.of(oldPath));
+            }
+
+            String filename = UUID.randomUUID() + ".img";
+            Path path = Path.of(IMAGE_DIR, filename);
+
+            Files.write(path, imageBytes);
+            return path.toString();
+
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to save image", e);
+        }
+    }
+
+    private byte[] readImageFromDisk(String path) {
+        try {
+            return Files.readAllBytes(Path.of(path));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read image", e);
+        }
+    }
