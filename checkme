@@ -1,25 +1,5 @@
-
-        try {
-            // delete old image if exists
-            if (oldPath != null) {
-                Files.deleteIfExists(Path.of(oldPath));
-            }
-
-            String filename = UUID.randomUUID() + ".img";
-            Path path = Path.of(IMAGE_DIR, filename);
-
-            Files.write(path, imageBytes);
-            return path.toString();
-
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to save image", e);
-        }
-    }
-
-    private byte[] readImageFromDisk(String path) {
-        try {
-            return Files.readAllBytes(Path.of(path));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to read image", e);
-        }
-    }
+ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName())
+            .contentLength(file.length())
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .body(resource);
