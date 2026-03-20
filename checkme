@@ -1,3 +1,19 @@
+@GetMapping("/download/help")
+    public ResponseEntity<Resource> downloadHelpFile() throws Exception {
+
+        Resource resource = new ClassPathResource("help.html");
+
+        if (!resource.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_HTML)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"help.html\"")
+                .body(resource);
+    }
+
+
 thirdparty.base-url=https://api.thirdparty.com
 thirdparty.token-url=https://api.thirdparty.com/token
 
