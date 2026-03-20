@@ -1,5 +1,180 @@
-ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName())
-            .contentLength(file.length())
-            .contentType(MediaType.APPLICATION_OCTET_STREAM)
-            .body(resource);
+thirdparty.base-url=https://api.thirdparty.com
+thirdparty.token-url=https://api.thirdparty.com/token
+
+thirdparty.username=your_username
+thirdparty.password=your_password
+=============================================
+package com.example.demo.dto;
+
+import lombok.Data;
+import java.util.Map;
+
+@Data
+public class ProxyRequest {
+    private String url;          // relative URL
+    private String method;       // GET / POST
+    private Map<String, Object> headers;
+    private Object body;
+}
+=================================================
+package com.example.demo.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
+
+@Configuration
+public class AppConfig {
+
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
+    }
+}
+==================================================
+package com.example.demo.service;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Map;
+
+@Service
+public class TokenService {
+
+    private final RestTemplate restTemplate;
+
+    @Value("${thirdparty.token-url}")
+    private String tokenUrl;
+
+    @Value("${thirdparty.username}")
+    private String username;
+
+    @Value("${thirdparty.password}")
+    private String password;
+
+    public TokenService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    public String getToken() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBasicAuth(username, password);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+                tokenUrl,
+                HttpMethod.GET,   // change if POST
+                entity,
+                Map.class
+        );
+
+        // Assuming response: { "access_token": "xyz" }
+        return (String) response.getBody().get("access_token");
+    }
+}
+===========================================
+package com.example.demo.client;
+
+import com.example.demo.dto.ProxyRequest;
+import com.example.demo.service.TokenService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Map;
+
+@Component
+public class ThirdPartyClient {
+
+    private final RestTemplate restTemplate;
+    private final TokenService tokenService;
+
+    @Value("${thirdparty.base-url}")
+    private String baseUrl;
+
+    public ThirdPartyClient(RestTemplate restTemplate, TokenService tokenService) {
+        this.restTemplate = restTemplate;
+        this.tokenService = tokenService;
+    }
+
+    public Map<String, Object> callThirdParty(ProxyRequest request) {
+
+        String token = tokenService.getToken();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // Add custom headers from client
+        if (request.getHeaders() != null) {
+            request.getHeaders().forEach((k, v) -> headers.add(k, String.valueOf(v)));
+        }
+
+        HttpEntity<Object> entity = new HttpEntity<>(request.getBody(), headers);
+
+        String finalUrl = baseUrl + request.getUrl();
+
+        HttpMethod method = HttpMethod.valueOf(request.getMethod().toUpperCase());
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+                finalUrl,
+                method,
+                entity,
+                Map.class
+        );
+
+        return response.getBody();
+    }
+}
+==================================================
+package com.example.demo.service;
+
+import com.example.demo.client.ThirdPartyClient;
+import com.example.demo.dto.ProxyRequest;
+import org.springframework.stereotype.Service;
+
+import java.util.Map;
+
+@Service
+public class ProxyService {
+
+    private final ThirdPartyClient client;
+
+    public ProxyService(ThirdPartyClient client) {
+        this.client = client;
+    }
+
+    public Map<String, Object> process(ProxyRequest request) {
+        return client.callThirdParty(request);
+    }
+}
+===================================================
+package com.example.demo.controller;
+
+import com.example.demo.dto.ProxyRequest;
+import com.example.demo.service.ProxyService;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/proxy")
+public class ProxyController {
+
+    private final ProxyService proxyService;
+
+    public ProxyController(ProxyService proxyService) {
+        this.proxyService = proxyService;
+    }
+
+    @PostMapping
+    public Map<String, Object> proxy(@RequestBody ProxyRequest request) {
+        return proxyService.process(request);
+    }
+}
