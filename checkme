@@ -1,11 +1,22 @@
-RequestConfig config = RequestConfig.custom()
-            .setConnectTimeout(timeout)
-            .setConnectionRequestTimeout(timeout)
-            .setSocketTimeout(timeout) // IMPORTANT
-            .build();
+public ResponseEntity<String> callApi(String className, String jsonString, String url) throws Exception {
 
-    CloseableHttpClient client = HttpClients.custom()
-            .setDefaultRequestConfig(config)
-            .build();
+    // Step 1: Load class
+    Class<?> clazz = Class.forName(className);
 
-    return new RestTemplate(new HttpComponentsClientHttpRequestFactory(client));
+    // Step 2: Convert JSON → List<clazz>
+    ObjectMapper objectMapper = new ObjectMapper();
+    JavaType type = objectMapper.getTypeFactory()
+            .constructCollectionType(List.class, clazz);
+
+    List<?> list = objectMapper.readValue(jsonString, type);
+
+    // Step 3: Call API
+    RestTemplate restTemplate = new RestTemplate();
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+
+    HttpEntity<List<?>> request = new HttpEntity<>(list, headers);
+
+    return restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+}
