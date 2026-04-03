@@ -1,40 +1,17 @@
-import java.io.IOException;
-import java.nio.file.*;
-import java.util.stream.Stream;
+    public static Set<String> processFolder(String folderPath) throws IOException {
+        Set<String> fileNameSet = new HashSet<>();
 
-public class FolderComparator {
-
-    public static void compareFolders(Path folder1, Path folder2) throws IOException {
-
-        try (Stream<Path> files = Files.list(folder1)) {
-            files
+        try (Stream<Path> paths = Files.list(Paths.get(folderPath))) {
+            paths
                 .filter(Files::isRegularFile)
-                .forEach(file1 -> {
+                .forEach(path -> {
                     try {
-                        String originalName = file1.getFileName().toString();
-                        String modifiedName = manipulateFileName(originalName);
+                        long lineCount = Files.lines(path).count();
 
-                        // Search in folder2
-                        try (Stream<Path> folder2Files = Files.list(folder2)) {
-                            folder2Files
-                                .filter(Files::isRegularFile)
-                                .filter(file2 -> file2.getFileName().toString().startsWith(modifiedName))
-                                .forEach(file2 -> {
-                                    try {
-                                        long lineCount = Files.lines(file2).count();
-
-                                        if (lineCount > 1) {
-                                            System.out.println("Match found:");
-                                            System.out.println("Folder1 File: " + file1);
-                                            System.out.println("Folder2 File: " + file2);
-                                            System.out.println("Line Count: " + lineCount);
-                                            System.out.println("---------------------------");
-                                        }
-
-                                    } catch (IOException e) {
-                                        e.printStackTrace();
-                                    }
-                                });
+                        if (lineCount > 2) {
+                            String originalName = path.getFileName().toString();
+                            String modifiedName = manipulateFileName(originalName);
+                            fileNameSet.add(modifiedName);
                         }
 
                     } catch (IOException e) {
@@ -42,29 +19,16 @@ public class FolderComparator {
                     }
                 });
         }
+
+        return fileNameSet;
     }
 
-    /**
-     * Placeholder function to manipulate file name.
-     * Modify this as per your requirement.
-     */
+    // Placeholder for your custom logic
     private static String manipulateFileName(String fileName) {
-        // Example: remove extension
+        // Example: remove extension + lowercase
         int dotIndex = fileName.lastIndexOf('.');
-        if (dotIndex > 0) {
-            return fileName.substring(0, dotIndex);
-        }
-        return fileName;
+        String nameWithoutExt = (dotIndex > 0) ? fileName.substring(0, dotIndex) : fileName;
 
-        // You can customize:
-        // return fileName.replace("_old", "");
-        // return fileName.substring(0, 5);
-    }
-
-    public static void main(String[] args) throws IOException {
-        Path folder1 = Paths.get("C:/folder1");
-        Path folder2 = Paths.get("C:/folder2");
-
-        compareFolders(folder1, folder2);
+        return nameWithoutExt.toLowerCase();
     }
 }
