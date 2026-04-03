@@ -1,22 +1,70 @@
-public ResponseEntity<String> callApi(String className, String jsonString, String url) throws Exception {
+import java.io.IOException;
+import java.nio.file.*;
+import java.util.stream.Stream;
 
-    // Step 1: Load class
-    Class<?> clazz = Class.forName(className);
+public class FolderComparator {
 
-    // Step 2: Convert JSON → List<clazz>
-    ObjectMapper objectMapper = new ObjectMapper();
-    JavaType type = objectMapper.getTypeFactory()
-            .constructCollectionType(List.class, clazz);
+    public static void compareFolders(Path folder1, Path folder2) throws IOException {
 
-    List<?> list = objectMapper.readValue(jsonString, type);
+        try (Stream<Path> files = Files.list(folder1)) {
+            files
+                .filter(Files::isRegularFile)
+                .forEach(file1 -> {
+                    try {
+                        String originalName = file1.getFileName().toString();
+                        String modifiedName = manipulateFileName(originalName);
 
-    // Step 3: Call API
-    RestTemplate restTemplate = new RestTemplate();
+                        // Search in folder2
+                        try (Stream<Path> folder2Files = Files.list(folder2)) {
+                            folder2Files
+                                .filter(Files::isRegularFile)
+                                .filter(file2 -> file2.getFileName().toString().startsWith(modifiedName))
+                                .forEach(file2 -> {
+                                    try {
+                                        long lineCount = Files.lines(file2).count();
 
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_JSON);
+                                        if (lineCount > 1) {
+                                            System.out.println("Match found:");
+                                            System.out.println("Folder1 File: " + file1);
+                                            System.out.println("Folder2 File: " + file2);
+                                            System.out.println("Line Count: " + lineCount);
+                                            System.out.println("---------------------------");
+                                        }
 
-    HttpEntity<List<?>> request = new HttpEntity<>(list, headers);
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                });
+                        }
 
-    return restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
+        }
+    }
+
+    /**
+     * Placeholder function to manipulate file name.
+     * Modify this as per your requirement.
+     */
+    private static String manipulateFileName(String fileName) {
+        // Example: remove extension
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex > 0) {
+            return fileName.substring(0, dotIndex);
+        }
+        return fileName;
+
+        // You can customize:
+        // return fileName.replace("_old", "");
+        // return fileName.substring(0, 5);
+    }
+
+    public static void main(String[] args) throws IOException {
+        Path folder1 = Paths.get("C:/folder1");
+        Path folder2 = Paths.get("C:/folder2");
+
+        compareFolders(folder1, folder2);
+    }
 }
