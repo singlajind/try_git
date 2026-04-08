@@ -1,34 +1,6 @@
-    public static Set<String> processFolder(String folderPath) throws IOException {
-        Set<String> fileNameSet = new HashSet<>();
-
-        try (Stream<Path> paths = Files.list(Paths.get(folderPath))) {
+try (Stream<Path> paths = Files.walk(path)) {
             paths
                 .filter(Files::isRegularFile)
-                .forEach(path -> {
-                    try {
-                        long lineCount = Files.lines(path).count();
-
-                        if (lineCount > 2) {
-                            String originalName = path.getFileName().toString();
-                            String modifiedName = manipulateFileName(originalName);
-                            fileNameSet.add(modifiedName);
-                        }
-
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                });
+                .filter(p -> p.toString().endsWith(".txt"))
+                .forEach(this::yourMethod);
         }
-
-        return fileNameSet;
-    }
-
-    // Placeholder for your custom logic
-    private static String manipulateFileName(String fileName) {
-        // Example: remove extension + lowercase
-        int dotIndex = fileName.lastIndexOf('.');
-        String nameWithoutExt = (dotIndex > 0) ? fileName.substring(0, dotIndex) : fileName;
-
-        return nameWithoutExt.toLowerCase();
-    }
-}
