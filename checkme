@@ -1,6 +1,11 @@
-try (Stream<Path> paths = Files.walk(path)) {
-            paths
-                .filter(Files::isRegularFile)
-                .filter(p -> p.toString().endsWith(".txt"))
-                .forEach(this::yourMethod);
-        }
+Map<String, List<Person>> result =
+    persons.stream()
+           .collect(Collectors.groupingBy(
+               Person::getDepartment,
+               Collectors.collectingAndThen(
+                   Collectors.toList(),
+                   list -> list.stream()
+                               .sorted(Comparator.comparing(Person::getAge))
+                               .collect(Collectors.toList())
+               )
+           ));
