@@ -1,6 +1,23 @@
-@echo off
-set "filepath=C:\Users\Amit\Documents\file.txt"
+CREATE FUNCTION dbo.STRING_AGG_CUSTOM
+(
+    @tableName NVARCHAR(128),
+    @columnName NVARCHAR(128),
+    @delimiter NVARCHAR(10)
+)
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    DECLARE @sql NVARCHAR(MAX);
+    DECLARE @result NVARCHAR(MAX);
 
-set "newpath=%filepath:\=/%"
+    SET @sql = '
+    SELECT @res = STUFF((
+        SELECT ' + QUOTENAME(@delimiter,'''') + ' + CAST(' + QUOTENAME(@columnName) + ' AS NVARCHAR(MAX))
+        FROM ' + QUOTENAME(@tableName) + '
+        FOR XML PATH(''''), TYPE
+    ).value(''.'', ''NVARCHAR(MAX)''), 1, LEN(''' + @delimiter + '''), '''')';
 
-echo %newpath%
+    EXEC sp_executesql @sql, N'@res NVARCHAR(MAX) OUTPUT', @res = @result OUTPUT;
+
+    RETURN @result;
+END;
