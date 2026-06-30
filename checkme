@@ -1,1 +1,71 @@
-As today is my last day on this project, I would like to thank everyone for the wonderful experience. I had a great time working with such a talented and supportive team, and I learned a lot throughout this journey. The collaboration, knowledge sharing, and camaraderie have been truly memorable. I sincerely hope our paths cross again, and I get the opportunity to work with all of you in the future. Thank you, and I wish everyone continued success!
+with 
+
+dbdata as (
+SELECT IL.CUSIP CUSIP, IL.SEDOL SEDOL, IL.ISIN,IL.SecurityName, IL.Ticker TICKER, OSC.CustomField1 ListCodeName, OSC.CustomField2 owner, rlh.DatetimeRestricted, rlh.DateUnrestricted, rlh.DatetimeUnrestricted, ins.exchangeCode
+FROM DBO.RestrictedListHistory RLH
+INNER JOIN raw.InstrumentList IL ON RLH.InstrumentId=IL.Id
+INNER JOIN REF.RestrictionCategory RC ON RLH.RestrictionCategoryId =RC.Id
+INNER JOIN REF.OutgoingSystemConfig OSC ON OSC.RestrictionCategoryId= RC.Id
+where RC.Id IN (1,6)
+AND OSC.OutgoingSystem = 'MCO F00004'
+and (RLH.DateUnrestricted IS NULL OR RLH.DateUnrestricted> CAST(GETDATE() AS DATE))
+and (RLH.DateRestricted <= CAST(GETDATE() AS DATE))),
+
+mcodata as(
+select CUSIP mcusip, ISIN misin,TICKER_SYMBOL mticker ,SEDOL msedol ,SECURITY_NAME mSecurityName, LIST_NAME ListCodeName, osc.CustomField2 owner,DATE_FROM DatetimeRestricted, getdate() DatetimeUnrestricted 
+from raw.MCORecon mr
+inner join REF.OutgoingSystemConfig osc ON (OSC.CustomField1= mr.LIST_NAME and osc.OutgoingSystem = 'MCO F00004')
+where BATCH_NUM = (select max(BATCH_NUM) from raw.MCORecon)
+and IS_DELETED=0
+and (LIST_NAME = 'ALL' or LIST_NAME ='Volantis RL')
+and (STATUS IS NULL or STATUS ='ACTIVE')
+and (SOURCE_TYPE = 'FEED' OR SOURCE_TYPE IS NULL)),
+
+jointdata as (
+select * 
+from dbdata dd 
+full join mcodata md on (dd.listname-md.LIST NAME and 
+(dd.ISIN = md.misin or dd.SEDOL =md.msedol or dd.SecurityName =md.SECURITY NAME 
+or dd.TICKER-md.TICKER SYMBOL or dd.CUSIP =md.mcusip)))
+
+--Unrestrict
+SELECT distinct
+coalesce(ins.mSecurityName, '') [SecurityName],
+coalesce(ins.mCUSIP, '') CUSIP,
+coalesce(ins.mTicker, '') Ticker,
+coalesce(ins.mISIN, '') ISIN,
+coalesce(ins.mSEDOL,'') SEDOL,
+CONCAT (CONVERT(VARCHAR(10), DatetimeRestricted, 101) ,   ' ' , CONVERT(VARCHAR(8), DatetimeRestricted, 108)) AS FromDate,
+CONCAT (CONVERT(VARCHAR(10), DatetimeUnrestricted, 101) , ' ' , CONVERT(VARCHAR(8), DatetimeUnrestricted, 108)) END AS ToDate,
+osc.CustomField1 [ListCodeName]
+'Unrestriction for Reconciliation' [AdditionalNotes],
+'' [ExchangeSymbol],
+'Y' [RestrictAtIssuerLevel],
+2,
+CONCAT( '${outFileLocation}' ,SUBSTRING(ors.OutgoingSystem, 5, LEN(ors.OutgoingSystem)), '_${outFileName}', '_', REPLACE(ors.RestrictionCategoryName, '',_'),'.txt') [outFile],
+'None' transactionTypeName,
+jd.owner
+from jointdata
+listname is null
+
+UNION ALL
+
+--Restrict
+SELECT distinct
+coalesce(jd.SecurityName, '') [SecurityName],
+coalesce(jd.CUSIP, '') CUSIP,
+coalesce(jd.Ticker, '') Ticker,
+coalesce(jd.ISIN, '') ISIN,
+coalesce(jd.SEDOL,'') SEDOL,
+CONCAT (CONVERT (VARCHAR(10), DatetimeRestricted, 101) ,' ' , CONVERT(VARCHAR(8), DatetimeRestricted, 108)) AS FromDate,
+CASE WHEN jd.DateUnrestricted is null THEN ''  ELSE CONCAT(CONVERT(VARCHAR(10), DatetimeUnrestricted, 101) , ' ' ,CONVERT(VARCHAR(8), DatetimeUnrestricted, 108)) END AS ToDate,
+jd.ListCodeName
+coalesce(rlh.Notes, '') [AdditionalNotes],
+COALESCE(jd.exchangeCode, '') [ExchangeSymbol],
+'Y' [RestrictAtIssuerLevel],
+1 ActionTypeId,
+CONCAT( '${outFileLocation}' ,SUBSTRING(ors.OutgoingSystem, 5, LEN(ors.OutgoingSystem)), '_${outFileName}', '_', REPLACE(ors.RestrictionCategoryName, '',_'),'.txt') [outFile],
+'None' transactionTypeName,
+jd.owner
+from jointdata jd
+where LIST_NAME IS NULL;
