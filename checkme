@@ -10,7 +10,8 @@ where RC.Id IN (1,6)
 AND OSC.OutgoingSystem = 'MCO F00004'
 and (RLH.DateUnrestricted IS NULL OR RLH.DateUnrestricted> CAST(GETDATE() AS DATE))
 and (RLH.DateRestricted <= CAST(GETDATE() AS DATE))),
-
+DELETE FROM assignment_history WHERE job_id IN (SELECT Id FROM schedule_template_instance WHERE completion_time < '2026-07-29 00:00:00')
+DELETE FROM schedule_template_instance WHERE completion_time < '2026-07-29 00:00:00'
 mcodata as(
 select CUSIP mcusip, ISIN misin,TICKER_SYMBOL mticker ,SEDOL msedol ,SECURITY_NAME mSecurityName, LIST_NAME ListCodeName, osc.CustomField2 owner,DATE_FROM DatetimeRestricted, getdate() DatetimeUnrestricted 
 from raw.MCORecon mr
