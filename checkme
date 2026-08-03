@@ -8,6 +8,20 @@ INNER JOIN REF.RestrictionCategory RC ON RLH.RestrictionCategoryId =RC.Id
 INNER JOIN REF.OutgoingSystemConfig OSC ON OSC.RestrictionCategoryId= RC.Id
 where RC.Id IN (1,6)
 AND OSC.OutgoingSystem = 'MCO F00004'
+
+I got to know via  that in application SLA needs to be changed with Timeliness. Post change labels would be :
+
+On UI
+=============
+SLA Met | Breach  -> Timeliness Met | Breach
+SLA (EST) -> Timeliness (EST)
+SLA Breached -> Timeliness Breached
+
+In AM/PM report
+======================
+Planned SLA (EST) -> Planned Timeliness (EST)
+
+
 and (RLH.DateUnrestricted IS NULL OR RLH.DateUnrestricted> CAST(GETDATE() AS DATE))
 and (RLH.DateRestricted <= CAST(GETDATE() AS DATE))),
 DELETE FROM assignment_history WHERE job_id IN (SELECT Id FROM schedule_template_instance WHERE completion_time < '2026-07-29 00:00:00')
